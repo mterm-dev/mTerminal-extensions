@@ -1,6 +1,6 @@
 {
   "name": "@mterminal/ext-error-linkifier",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Detects file:line:col patterns in terminal output and exposes a click-to-open command",
   "license": "MIT",
   "renderer": "src/renderer.mjs",

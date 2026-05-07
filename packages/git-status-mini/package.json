@@ -1,6 +1,6 @@
 {
   "name": "@mterminal/ext-git-status-mini",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A small Git status panel \u2014 proof-of-concept for the extension API",
   "license": "MIT",
   "type": "module",
