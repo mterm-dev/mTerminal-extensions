@@ -54,5 +54,5 @@ jobs:
           MTX_API_KEY: ${{ secrets.MTX_API_KEY }}
           MTX_ENDPOINT: ${{ secrets.MTX_ENDPOINT }}
         run: |
-          pnpm exec mtx pack
-          pnpm exec mtx publish
+          pnpm dlx @mterminal/mtx pack
+          pnpm dlx @mterminal/mtx publish

@@ -1,6 +1,6 @@
 {
   "name": "@mterminal/ext-theme-pack-extra",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A small bundle of extra themes shipped with mTerminal",
   "license": "MIT",
   "engines": {

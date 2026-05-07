@@ -1,6 +1,6 @@
 {
   "name": "@mterminal/ext-file-browser",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Side-panel file browser with full CRUD over local fs and SSH/SFTP",
   "license": "MIT",
   "type": "module",
