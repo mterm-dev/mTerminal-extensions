@@ -45,8 +45,8 @@
     "activationEvents": ["onStartupFinished"],
     "capabilities": ["child-process", "network:limited", "filesystem:read"],
     "publisher": {
-      "authorId": "gh-PLACEHOLDER",
-      "keyId": "gh-PLACEHOLDER:key1"
+      "authorId": "gh-1319048221",
+      "keyId": "gh-1319048221:key1"
     },
     "providedServices": {
       "host-registry": { "version": "1.0.0" },

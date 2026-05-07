@@ -13,11 +13,13 @@
   "mterminal": {
     "id": "theme-pack-extra",
     "displayName": "Theme Pack: Extra",
-    "activationEvents": [],
-    "capabilities": ["ui:theme"],
+    "activationEvents": [
+      "onStartupFinished"
+    ],
+    "capabilities": [],
     "publisher": {
-      "authorId": "gh-PLACEHOLDER",
-      "keyId": "gh-PLACEHOLDER:key1"
+      "authorId": "gh-3298429511",
+      "keyId": "gh-3298429511:key1"
     },
     "contributes": {
       "themes": [

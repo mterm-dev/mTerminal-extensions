@@ -16,10 +16,10 @@
     "id": "error-linkifier",
     "displayName": "Error Linkifier",
     "activationEvents": ["onStartupFinished"],
-    "capabilities": ["terminal:read"],
+    "capabilities": [],
     "publisher": {
-      "authorId": "gh-PLACEHOLDER",
-      "keyId": "gh-PLACEHOLDER:key1"
+      "authorId": "gh-1319048221",
+      "keyId": "gh-1319048221:key1"
     },
     "contributes": {
       "commands": [

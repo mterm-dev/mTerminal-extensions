@@ -36,15 +36,14 @@
     "icon": "icons/git.svg",
     "activationEvents": ["onStartupFinished"],
     "capabilities": [
-      "ui:sidebar",
       "filesystem:read",
       "filesystem:write",
       "child-process",
       "network:limited"
     ],
     "publisher": {
-      "authorId": "gh-PLACEHOLDER",
-      "keyId": "gh-PLACEHOLDER:key1"
+      "authorId": "gh-1319048221",
+      "keyId": "gh-1319048221:key1"
     },
     "contributes": {
       "panels": [
