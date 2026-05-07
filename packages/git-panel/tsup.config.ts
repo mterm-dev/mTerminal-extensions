@@ -10,15 +10,7 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   external: ['@mterminal/extension-api'],
-  noExternal: [
-    'react',
-    'react-dom',
-    'react-dom/client',
-    'react/jsx-runtime',
-    'scheduler',
-    'highlight.js',
-    /^highlight\.js\//,
-  ],
+  noExternal: [/.*/],
   define: {
     'process.env.NODE_ENV': JSON.stringify('production'),
   },
