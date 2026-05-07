@@ -39,20 +39,29 @@ jobs:
       - name: Build
         run: pnpm --filter "@mterminal/ext-${{ steps.parse.outputs.ext_id }}" run build
 
-      - name: Write signing key
+      - name: Configure mtx
         env:
           MTX_PRIVATE_KEY: ${{ secrets.MTX_PRIVATE_KEY }}
+          MTX_API_KEY: ${{ secrets.MTX_API_KEY }}
+          MTX_ENDPOINT: ${{ secrets.MTX_ENDPOINT }}
         run: |
           mkdir -p "$HOME/.mtx/keys"
           chmod 700 "$HOME/.mtx" "$HOME/.mtx/keys"
-          printf '%s' "$MTX_PRIVATE_KEY" > "$HOME/.mtx/keys/ci.priv"
-          chmod 600 "$HOME/.mtx/keys/ci.priv"
+          printf '%s' "$MTX_PRIVATE_KEY" > "$HOME/.mtx/keys/gh-61193738:key1.priv"
+          chmod 600 "$HOME/.mtx/keys/gh-61193738:key1.priv"
+          cat > "$HOME/.mtx/config.json" <<EOF
+          {
+            "endpoint": "$MTX_ENDPOINT",
+            "authorId": "gh-61193738",
+            "apiKey": "$MTX_API_KEY",
+            "githubLogin": "arthurr0",
+            "activeKeyId": "gh-61193738:key1"
+          }
+          EOF
+          chmod 600 "$HOME/.mtx/config.json"
 
       - name: Pack and publish
         working-directory: packages/${{ steps.parse.outputs.ext_id }}
-        env:
-          MTX_API_KEY: ${{ secrets.MTX_API_KEY }}
-          MTX_ENDPOINT: ${{ secrets.MTX_ENDPOINT }}
         run: |
           pnpm dlx @mterminal/mtx pack
           pnpm dlx @mterminal/mtx publish
