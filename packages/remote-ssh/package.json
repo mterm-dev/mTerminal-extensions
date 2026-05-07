@@ -27,7 +27,7 @@
     "@xterm/addon-web-links": "^0.11.0"
   },
   "devDependencies": {
-    "@mterminal/extension-api": "file:../../../mTerminal/packages/extension-api",
+    "@mterminal/extension-api": "workspace:^",
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

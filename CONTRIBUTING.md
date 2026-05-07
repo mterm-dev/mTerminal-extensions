@@ -17,13 +17,15 @@
    { "name": "@mterminal/ext-my-extension" }
    ```
 
-3. Add `@mterminal/extension-api` as a devDependency. Until the API package is published on npm, point at the sibling `mTerminal` clone:
+3. Add `@mterminal/extension-api` as a devDependency via the workspace protocol:
 
    ```json
    "devDependencies": {
-     "@mterminal/extension-api": "file:../../../mTerminal/packages/extension-api"
+     "@mterminal/extension-api": "workspace:^"
    }
    ```
+
+   The package lives at `packages/extension-api/` inside this repo.
 
 4. Implement the extension. Build verifies the bundle:
 

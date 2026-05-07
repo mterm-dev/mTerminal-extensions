@@ -20,6 +20,8 @@ importers:
 
   packages/error-linkifier: {}
 
+  packages/extension-api: {}
+
   packages/file-browser:
     dependencies:
       '@codemirror/autocomplete':
@@ -102,8 +104,8 @@ importers:
         version: 6.0.2
     devDependencies:
       '@mterminal/extension-api':
-        specifier: file:../../../mTerminal/packages/extension-api
-        version: file:../mTerminal/packages/extension-api
+        specifier: workspace:^
+        version: link:../extension-api
       '@types/node':
         specifier: ^24.0.0
         version: 24.12.2
@@ -136,8 +138,8 @@ importers:
         version: 11.11.1
     devDependencies:
       '@mterminal/extension-api':
-        specifier: file:../../../mTerminal/packages/extension-api
-        version: file:../mTerminal/packages/extension-api
+        specifier: workspace:^
+        version: link:../extension-api
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.14
@@ -175,8 +177,8 @@ importers:
         version: 1.17.0
     devDependencies:
       '@mterminal/extension-api':
-        specifier: file:../../../mTerminal/packages/extension-api
-        version: file:../mTerminal/packages/extension-api
+        specifier: workspace:^
+        version: link:../extension-api
       '@types/node':
         specifier: ^24.0.0
         version: 24.12.2
@@ -519,9 +521,6 @@ packages:
 
   '@marijn/find-cluster-break@1.0.2':
     resolution: {integrity: sha512-l0h88YhZFyKdXIFNfSWpyjStDjGHwZ/U7iobcK1cQQD8sejsONdQtTVU+1wVN1PBw40PiiHB1vA5S7VTfQiP9g==}
-
-  '@mterminal/extension-api@file:../mTerminal/packages/extension-api':
-    resolution: {directory: ../mTerminal/packages/extension-api, type: directory}
 
   '@napi-rs/wasm-runtime@1.1.4':
     resolution: {integrity: sha512-3NQNNgA1YSlJb/kMH1ildASP9HW7/7kYnRI2szWJaofaS1hWmbGI4H+d3+22aGzXXN9IJ+n+GiFVcGipJP18ow==}
@@ -1988,8 +1987,6 @@ snapshots:
       '@lezer/lr': 1.4.10
 
   '@marijn/find-cluster-break@1.0.2': {}
-
-  '@mterminal/extension-api@file:../mTerminal/packages/extension-api': {}
 
   '@napi-rs/wasm-runtime@1.1.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:

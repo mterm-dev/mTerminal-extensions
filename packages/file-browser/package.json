@@ -52,7 +52,7 @@
     "codemirror": "^6.0.1"
   },
   "devDependencies": {
-    "@mterminal/extension-api": "file:../../../mTerminal/packages/extension-api",
+    "@mterminal/extension-api": "workspace:^",
     "@types/node": "^24.0.0",
     "electron": "^33.0.0",
     "@types/react": "^19.2.14",

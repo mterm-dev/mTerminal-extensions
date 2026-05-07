@@ -22,7 +22,7 @@
     "highlight.js": "^11.11.1"
   },
   "devDependencies": {
-    "@mterminal/extension-api": "file:../../../mTerminal/packages/extension-api",
+    "@mterminal/extension-api": "workspace:^",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "react": "^19.2.5",
