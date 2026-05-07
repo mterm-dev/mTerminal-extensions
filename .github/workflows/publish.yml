@@ -36,6 +36,19 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Set version from tag
+        working-directory: packages/${{ steps.parse.outputs.ext_id }}
+        env:
+          VERSION: ${{ steps.parse.outputs.version }}
+        run: |
+          node <<'EOF'
+          const fs = require('node:fs');
+          const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          p.version = process.env.VERSION;
+          fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          console.log(`set ${p.name} version to ${p.version}`);
+          EOF
+
       - name: Build
         run: pnpm --filter "@mterminal/ext-${{ steps.parse.outputs.ext_id }}" run build
 
