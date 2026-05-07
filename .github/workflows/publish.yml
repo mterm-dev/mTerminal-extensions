@@ -1,0 +1,60 @@
+name: publish
+
+on:
+  push:
+    tags:
+      - '*-v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Parse tag
+        id: parse
+        run: |
+          tag="${GITHUB_REF##refs/tags/}"
+          ext_id="${tag%-v*}"
+          version="${tag##*-v}"
+          if [ -z "$ext_id" ] || [ -z "$version" ]; then
+            echo "::error::Invalid tag format. Expected '<id>-v<version>', got '$tag'"
+            exit 1
+          fi
+          if [ ! -d "packages/$ext_id" ]; then
+            echo "::error::No package found at packages/$ext_id"
+            exit 1
+          fi
+          echo "ext_id=$ext_id" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm --filter "@mterminal/ext-${{ steps.parse.outputs.ext_id }}" run build
+
+      - name: Write signing key
+        env:
+          MTX_PRIVATE_KEY: ${{ secrets.MTX_PRIVATE_KEY }}
+        run: |
+          mkdir -p "$HOME/.mtx/keys"
+          chmod 700 "$HOME/.mtx" "$HOME/.mtx/keys"
+          printf '%s' "$MTX_PRIVATE_KEY" > "$HOME/.mtx/keys/ci.priv"
+          chmod 600 "$HOME/.mtx/keys/ci.priv"
+
+      - name: Pack and publish
+        working-directory: packages/${{ steps.parse.outputs.ext_id }}
+        env:
+          MTX_API_KEY: ${{ secrets.MTX_API_KEY }}
+          MTX_ENDPOINT: ${{ secrets.MTX_ENDPOINT }}
+        run: |
+          pnpm exec mtx pack
+          pnpm exec mtx publish
