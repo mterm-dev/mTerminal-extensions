@@ -1,6 +1,6 @@
 {
   "name": "@mterminal/ext-git-panel",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Full-featured Git panel for mTerminal",
   "license": "MIT",
   "type": "module",
