@@ -15,11 +15,13 @@
   "mterminal": {
     "id": "error-linkifier",
     "displayName": "Error Linkifier",
-    "activationEvents": ["onStartupFinished"],
+    "activationEvents": [
+      "onStartupFinished"
+    ],
     "capabilities": [],
     "publisher": {
-      "authorId": "gh-1319048221",
-      "keyId": "gh-1319048221:key1"
+      "authorId": "gh-61193738",
+      "keyId": "gh-61193738:key1"
     },
     "contributes": {
       "commands": [

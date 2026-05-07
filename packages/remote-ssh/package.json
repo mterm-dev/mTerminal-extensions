@@ -42,32 +42,61 @@
     "id": "remote-ssh",
     "displayName": "Remote SSH",
     "icon": "icons/remote.svg",
-    "activationEvents": ["onStartupFinished"],
-    "capabilities": ["child-process", "network:limited", "filesystem:read"],
+    "activationEvents": [
+      "onStartupFinished"
+    ],
+    "capabilities": [
+      "child-process",
+      "network:limited",
+      "filesystem:read"
+    ],
     "publisher": {
-      "authorId": "gh-1319048221",
-      "keyId": "gh-1319048221:key1"
+      "authorId": "gh-61193738",
+      "keyId": "gh-61193738:key1"
     },
     "providedServices": {
-      "host-registry": { "version": "1.0.0" },
-      "sftp-fs": { "version": "1.0.0" }
+      "host-registry": {
+        "version": "1.0.0"
+      },
+      "sftp-fs": {
+        "version": "1.0.0"
+      }
     },
     "contributes": {
       "tabTypes": [
-        { "id": "remote-ssh-terminal", "title": "ssh" }
+        {
+          "id": "remote-ssh-terminal",
+          "title": "ssh"
+        }
       ],
       "panels": [
-        { "id": "remote-ssh.hosts", "title": "remote", "location": "sidebar" }
+        {
+          "id": "remote-ssh.hosts",
+          "title": "remote",
+          "location": "sidebar"
+        }
       ],
       "commands": [
-        { "id": "remoteSsh.openHostsPanel", "title": "Remote SSH: open hosts panel" },
-        { "id": "remoteSsh.addHost", "title": "Remote SSH: add host" }
+        {
+          "id": "remoteSsh.openHostsPanel",
+          "title": "Remote SSH: open hosts panel"
+        },
+        {
+          "id": "remoteSsh.addHost",
+          "title": "Remote SSH: add host"
+        }
       ],
       "keybindings": [
-        { "command": "remoteSsh.openHostsPanel", "key": "Ctrl+Shift+G" }
+        {
+          "command": "remoteSsh.openHostsPanel",
+          "key": "Ctrl+Shift+G"
+        }
       ],
       "secrets": [
-        { "key": "host:*", "title": "saved host passwords" }
+        {
+          "key": "host:*",
+          "title": "saved host passwords"
+        }
       ],
       "settings": {
         "type": "object",

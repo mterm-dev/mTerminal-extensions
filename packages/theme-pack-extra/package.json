@@ -18,8 +18,8 @@
     ],
     "capabilities": [],
     "publisher": {
-      "authorId": "gh-3298429511",
-      "keyId": "gh-3298429511:key1"
+      "authorId": "gh-61193738",
+      "keyId": "gh-61193738:key1"
     },
     "contributes": {
       "themes": [
@@ -30,7 +30,7 @@
         },
         {
           "id": "rosepine-pine",
-          "label": "Rose Pine — Pine",
+          "label": "Rose Pine \u2014 Pine",
           "path": "themes/rosepine-pine.json"
         }
       ]

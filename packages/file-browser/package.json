@@ -22,7 +22,9 @@
     "react-dom": "^19.0.0"
   },
   "peerDependenciesMeta": {
-    "electron": { "optional": true }
+    "electron": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.0",
@@ -69,18 +71,26 @@
     "id": "file-browser",
     "displayName": "File Browser",
     "icon": "icons/files.svg",
-    "activationEvents": ["onStartupFinished"],
+    "activationEvents": [
+      "onStartupFinished"
+    ],
     "capabilities": [
       "filesystem:read",
       "filesystem:write"
     ],
     "publisher": {
-      "authorId": "gh-1319048221",
-      "keyId": "gh-1319048221:key1"
+      "authorId": "gh-61193738",
+      "keyId": "gh-61193738:key1"
     },
     "consumedServices": {
-      "sftp-fs": { "versionRange": "^1.0.0", "optional": true },
-      "host-registry": { "versionRange": "^1.0.0", "optional": true }
+      "sftp-fs": {
+        "versionRange": "^1.0.0",
+        "optional": true
+      },
+      "host-registry": {
+        "versionRange": "^1.0.0",
+        "optional": true
+      }
     },
     "contributes": {
       "tabTypes": [
@@ -90,10 +100,16 @@
         }
       ],
       "commands": [
-        { "id": "fileBrowser.openInActiveGroup", "title": "File Browser: Open in active group" }
+        {
+          "id": "fileBrowser.openInActiveGroup",
+          "title": "File Browser: Open in active group"
+        }
       ],
       "keybindings": [
-        { "command": "fileBrowser.openInActiveGroup", "key": "Ctrl+B" }
+        {
+          "command": "fileBrowser.openInActiveGroup",
+          "key": "Ctrl+B"
+        }
       ],
       "settings": {
         "type": "object",

@@ -37,7 +37,9 @@
     "id": "git-panel",
     "displayName": "Git Panel",
     "icon": "icons/git.svg",
-    "activationEvents": ["onStartupFinished"],
+    "activationEvents": [
+      "onStartupFinished"
+    ],
     "capabilities": [
       "filesystem:read",
       "filesystem:write",
@@ -45,8 +47,8 @@
       "network:limited"
     ],
     "publisher": {
-      "authorId": "gh-1319048221",
-      "keyId": "gh-1319048221:key1"
+      "authorId": "gh-61193738",
+      "keyId": "gh-61193738:key1"
     },
     "contributes": {
       "panels": [
@@ -58,18 +60,49 @@
         }
       ],
       "commands": [
-        { "id": "gitPanel.refresh", "title": "Git: Refresh status" },
-        { "id": "gitPanel.commit", "title": "Git: Commit" },
-        { "id": "gitPanel.commitPush", "title": "Git: Commit and push" },
-        { "id": "gitPanel.push", "title": "Git: Push" },
-        { "id": "gitPanel.pull", "title": "Git: Pull" },
-        { "id": "gitPanel.fetch", "title": "Git: Fetch" },
-        { "id": "gitPanel.branches", "title": "Git: Branches" },
-        { "id": "gitPanel.history", "title": "Git: History" },
-        { "id": "gitPanel.generateMessage", "title": "Git: Generate AI commit message" }
+        {
+          "id": "gitPanel.refresh",
+          "title": "Git: Refresh status"
+        },
+        {
+          "id": "gitPanel.commit",
+          "title": "Git: Commit"
+        },
+        {
+          "id": "gitPanel.commitPush",
+          "title": "Git: Commit and push"
+        },
+        {
+          "id": "gitPanel.push",
+          "title": "Git: Push"
+        },
+        {
+          "id": "gitPanel.pull",
+          "title": "Git: Pull"
+        },
+        {
+          "id": "gitPanel.fetch",
+          "title": "Git: Fetch"
+        },
+        {
+          "id": "gitPanel.branches",
+          "title": "Git: Branches"
+        },
+        {
+          "id": "gitPanel.history",
+          "title": "Git: History"
+        },
+        {
+          "id": "gitPanel.generateMessage",
+          "title": "Git: Generate AI commit message"
+        }
       ],
       "keybindings": [
-        { "command": "gitPanel.commit", "key": "Ctrl+Enter", "when": "view == git-panel && !commitMessageEmpty" }
+        {
+          "command": "gitPanel.commit",
+          "key": "Ctrl+Enter",
+          "when": "view == git-panel && !commitMessageEmpty"
+        }
       ],
       "settings": {
         "type": "object",
@@ -96,7 +129,11 @@
           },
           "pullStrategy": {
             "type": "string",
-            "enum": ["ff-only", "merge", "rebase"],
+            "enum": [
+              "ff-only",
+              "merge",
+              "rebase"
+            ],
             "default": "ff-only",
             "description": "Default pull strategy"
           },
@@ -113,7 +150,11 @@
           "label": "Commit message generator",
           "description": "Picks the model used by the Generate button. Choose mTerminal's shared AI providers (vault keys) or use a private key scoped to this extension.",
           "supportsCore": true,
-          "providers": ["anthropic", "openai", "ollama"],
+          "providers": [
+            "anthropic",
+            "openai",
+            "ollama"
+          ],
           "defaultProvider": "anthropic",
           "defaultModels": {
             "anthropic": "claude-sonnet-4-5",
