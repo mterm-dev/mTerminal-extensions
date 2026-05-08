@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { GitPanel } from "./panel/GitPanel";
+import { mountSettings } from "./settings";
 import {
   DEFAULT_GIT_PANEL_SETTINGS,
   type GitPanelSettings,
@@ -54,6 +55,24 @@ interface ExtCtx {
     get<T = unknown>(key: string): T | undefined;
     set(key: string, value: unknown): void | Promise<void>;
     onChange(cb: (key: string, value: unknown) => void): { dispose: () => void };
+  };
+  settingsRenderer: {
+    register(spec: {
+      render(
+        host: HTMLElement,
+        ctx: {
+          host: HTMLElement;
+          extId: string;
+          settings: {
+            get<T = unknown>(key: string): T | undefined;
+            set(key: string, value: unknown): void | Promise<void>;
+            onChange(
+              cb: (key: string, value: unknown) => void,
+            ): { dispose: () => void };
+          };
+        },
+      ): void | (() => void);
+    }): { dispose: () => void };
   };
   events: {
     emit(event: string, payload?: unknown): void;
@@ -196,6 +215,12 @@ export function activate(ctx: ExtCtx): void {
     },
   });
   ctx.subscribe(refresh);
+
+  ctx.subscribe(
+    ctx.settingsRenderer.register({
+      render: (host, rctx) => mountSettings(host, rctx.settings),
+    }),
+  );
 }
 
 export function deactivate(): void {

@@ -8,9 +8,11 @@
  * the host-provided binding config — not flattened into this struct.
  */
 
+export type PullStrategy = "ff-only" | "merge" | "rebase";
+
 export interface GitPanelSettings {
   commitSystemPrompt: string;
-  pullStrategy: "ff-only" | "merge" | "rebase";
+  pullStrategy: PullStrategy;
 }
 
 export const DEFAULT_GIT_PANEL_SETTINGS: GitPanelSettings = {
