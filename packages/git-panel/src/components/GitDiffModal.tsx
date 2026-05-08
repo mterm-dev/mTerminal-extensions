@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getGitApi } from "../lib/git-api";
+import { getGitApi, toPathspec } from "../lib/git-api";
 import { useEscapeKey } from "../hooks/useEscapeKey";
 import { DiffView } from "./DiffView";
 
@@ -41,7 +41,7 @@ export function GitDiffModal({ cwd, path, staged, status, onClose }: Props) {
     setText("");
     setError(null);
     api
-      .diff(cwd, path, staged, view === "side" ? FULL_CONTEXT : undefined)
+      .diff(cwd, toPathspec(path), staged, view === "side" ? FULL_CONTEXT : undefined)
       .then((res) => {
         if (!active) return;
         setText(res.text);
