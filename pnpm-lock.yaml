@@ -18,8 +18,6 @@ importers:
         specifier: ^5.6.0
         version: 5.9.3
 
-  packages/error-linkifier: {}
-
   packages/extension-api: {}
 
   packages/file-browser:
@@ -171,7 +169,32 @@ importers:
         specifier: ^4.1.5
         version: 4.1.5(@types/node@24.12.2)(jsdom@29.1.1)(vite@8.0.11(@types/node@24.12.2)(esbuild@0.27.7))
 
-  packages/git-status-mini: {}
+  packages/hotbinds:
+    devDependencies:
+      '@mterminal/extension-api':
+        specifier: workspace:^
+        version: link:../extension-api
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.12.2
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.14)
+      react:
+        specifier: ^19.2.5
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.2.5
+        version: 19.2.6(react@19.2.6)
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(postcss@8.5.14)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
 
   packages/remote-ssh:
     dependencies:
@@ -218,8 +241,6 @@ importers:
       vitest:
         specifier: ^4.0.0
         version: 4.1.5(@types/node@24.12.2)(jsdom@29.1.1)(vite@8.0.11(@types/node@24.12.2)(esbuild@0.27.7))
-
-  packages/theme-pack-extra: {}
 
 packages:
 

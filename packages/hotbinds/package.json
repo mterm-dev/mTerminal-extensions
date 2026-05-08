@@ -1,0 +1,79 @@
+{
+  "name": "@mterminal/ext-hotbinds",
+  "version": "1.0.0",
+  "description": "Global hotkey snippets — fire predefined text into the focused input or active terminal",
+  "license": "MIT",
+  "type": "module",
+  "renderer": "dist/renderer.mjs",
+  "engines": {
+    "mterminal-api": "^1.0.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@mterminal/extension-api": "^1.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@mterminal/extension-api": "workspace:^",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "tsup": "^8.0.0",
+    "typescript": "^5.6.0"
+  },
+  "mterminal": {
+    "id": "hotbinds",
+    "displayName": "Hotbinds",
+    "activationEvents": [
+      "onStartupFinished"
+    ],
+    "publisher": {
+      "authorId": "gh-61193738",
+      "keyId": "gh-61193738:key1"
+    },
+    "contributes": {
+      "commands": [
+        {
+          "id": "hotbinds.manage",
+          "title": "Hotbinds: Manage bindings"
+        }
+      ],
+      "keybindings": [
+        {
+          "command": "hotbinds.manage",
+          "key": "Ctrl+Alt+H"
+        }
+      ],
+      "settings": {
+        "type": "object",
+        "properties": {
+          "bindings": {
+            "type": "array",
+            "description": "List of hotkey snippets. Edit via the manager (Ctrl+Alt+H) for the best UX.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "name": { "type": "string" },
+                "key": { "type": "string", "description": "e.g. Ctrl+Alt+1" },
+                "text": { "type": "string", "description": "Snippet text to insert" },
+                "submit": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "When firing into a terminal, append Enter to execute"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
