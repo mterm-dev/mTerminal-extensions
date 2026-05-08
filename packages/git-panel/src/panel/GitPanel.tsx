@@ -38,6 +38,7 @@ import { HistoryModal } from "../components/HistoryModal";
 import { PullDialog } from "../components/PullDialog";
 import { PushDialog } from "../components/PushDialog";
 import { ConflictResolverModal } from "../components/ConflictResolverModal";
+import { FileContextMenu, type FileMenuState } from "../components/FileContextMenu";
 import { isConflictFile } from "../lib/git-api";
 
 const FEW_SHOT_DIFF = `Generate a commit message for the following staged changes:
@@ -113,6 +114,7 @@ export function GitPanel({
   const [pullOpen, setPullOpen] = useState(false);
   const [pushOpen, setPushOpen] = useState(false);
   const [conflictsOpen, setConflictsOpen] = useState<{ initialPath?: string | null } | null>(null);
+  const [fileMenu, setFileMenu] = useState<FileMenuState | null>(null);
   const aiCancelRef = useRef<(() => void) | null>(null);
 
   const files = status?.files ?? [];
@@ -175,7 +177,9 @@ export function GitPanel({
 
   const rollbackFile = async (f: GitFile) => {
     if (!cwd) return;
-    const verb = f.untracked ? "delete untracked file" : "discard local changes to";
+    const verb = f.untracked
+      ? "delete untracked file"
+      : "discard local changes to";
     const ok = window.confirm(`${verb} '${f.path}'?\n\nThis cannot be undone.`);
     if (!ok) return;
     setActionError(null);
@@ -184,7 +188,7 @@ export function GitPanel({
       await runMutation(async (api) => {
         if (typeof api.discardPaths !== "function") {
           throw new Error(
-            "host does not implement mt.git.discardPaths — update mTerminal to use per-file rollback",
+            "host does not implement mt.git.discardPaths — update mTerminal to enable per-file rollback",
           );
         }
         await api.discardPaths(cwd, [f.path]);
@@ -194,6 +198,12 @@ export function GitPanel({
     } catch (e) {
       setActionError((e as Error).message);
     }
+  };
+
+  const openFileMenu = (e: { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number }, f: GitFile) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setFileMenu({ x: e.clientX, y: e.clientY, file: f });
   };
 
   const toggleDir = async (node: TreeNode) => {
@@ -697,7 +707,7 @@ export function GitPanel({
                           untracked: f.untracked,
                         },
                       }),
-                    onRollback: (f) => void rollbackFile(f),
+                    onContextMenu: (e, f) => openFileMenu(e, f),
                   })
                 : files.map((f) => (
                     <FileRow
@@ -718,7 +728,7 @@ export function GitPanel({
                           },
                         })
                       }
-                      onRollback={() => void rollbackFile(f)}
+                      onContextMenu={(e, file) => openFileMenu(e, file)}
                     />
                   ))}
             </div>
@@ -883,6 +893,14 @@ export function GitPanel({
             void refresh();
           }}
           onError={(msg) => setActionError(msg)}
+        />
+      )}
+
+      {fileMenu && (
+        <FileContextMenu
+          state={fileMenu}
+          onClose={() => setFileMenu(null)}
+          onRollback={(f) => void rollbackFile(f)}
         />
       )}
 

@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, type MouseEvent as RMouseEvent, type ReactNode } from "react";
 import type { GitFile } from "../hooks/useGitStatus";
 import {
   collectFilePaths,
@@ -7,7 +7,7 @@ import {
 } from "../lib/git-tree";
 import { getFileIcon } from "../lib/file-icons";
 import { Checkbox } from "./Checkbox";
-import { ChevronToggle, FolderIcon, RollbackIcon } from "./icons";
+import { ChevronToggle, FolderIcon } from "./icons";
 
 export function fileBadge(f: GitFile): { letter: string; cls: string; title: string } {
   if (f.untracked) return { letter: "?", cls: "untracked", title: "untracked" };
@@ -34,7 +34,7 @@ export interface RenderCtx {
   onToggleDir: (n: TreeNode) => void;
   onToggleDirCollapse: (path: string) => void;
   onOpenDiff: (f: GitFile) => void;
-  onRollback: (f: GitFile) => void;
+  onContextMenu: (e: RMouseEvent, f: GitFile) => void;
 }
 
 export function renderTree(
@@ -93,7 +93,7 @@ export function renderTree(
       busy={ctx.busy}
       onToggle={() => ctx.onToggleFile(f)}
       onOpenDiff={() => ctx.onOpenDiff(f)}
-      onRollback={() => ctx.onRollback(f)}
+      onContextMenu={ctx.onContextMenu}
       displayName={node.name}
       withChevronSpacer
     />
@@ -107,7 +107,7 @@ interface FileRowProps {
   busy: boolean;
   onToggle: () => void;
   onOpenDiff: () => void;
-  onRollback: () => void;
+  onContextMenu: (e: RMouseEvent, f: GitFile) => void;
   displayName?: string;
   withChevronSpacer?: boolean;
 }
@@ -119,7 +119,7 @@ export function FileRow({
   busy,
   onToggle,
   onOpenDiff,
-  onRollback,
+  onContextMenu,
   displayName,
   withChevronSpacer,
 }: FileRowProps) {
@@ -133,6 +133,7 @@ export function FileRow({
       style={{ paddingLeft: depth * 14 + 4 }}
       role="listitem"
       title={file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}
+      onContextMenu={(e) => onContextMenu(e, file)}
     >
       {withChevronSpacer && <span className="git-chevron-spacer" aria-hidden="true" />}
       <Checkbox
@@ -150,19 +151,6 @@ export function FileRow({
       <span className="git-file-path" onClick={onOpenDiff}>
         {displayName ?? file.path}
       </span>
-      <button
-        type="button"
-        className="ghost-btn git-icon-btn git-row-rollback"
-        title={file.untracked ? "rollback (delete untracked file)" : "rollback (discard local changes)"}
-        aria-label={`rollback ${file.path}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          onRollback();
-        }}
-        disabled={busy}
-      >
-        <RollbackIcon />
-      </button>
     </div>
   );
 }
