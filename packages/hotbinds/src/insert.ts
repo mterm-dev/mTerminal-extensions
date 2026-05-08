@@ -50,17 +50,31 @@ function insertIntoContentEditable(el: HTMLElement, text: string): void {
   el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text, inputType: 'insertText' }))
 }
 
+/**
+ * xterm.js keeps a hidden textarea for accessibility / IME (.xterm-helper-textarea).
+ * When the terminal is focused, `document.activeElement` is that textarea, not
+ * the visible buffer. Inserting into it does nothing — keystrokes drive the PTY,
+ * not the textarea's value. Detect any descendant of an xterm container and
+ * always route to the terminal API in that case.
+ */
+function isInsideXterm(el: Element | null): boolean {
+  if (!el) return false
+  return !!el.closest('.xterm, .xterm-screen, .xterm-helper-textarea, .xterm-viewport')
+}
+
 export async function fire(ctx: ExtCtx, binding: Binding): Promise<void> {
   const el = document.activeElement as HTMLElement | null
+  const insideTerminal = isInsideXterm(el)
 
-  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-    insertIntoTextField(el, binding.text)
-    return
-  }
-
-  if (el && el.isContentEditable) {
-    insertIntoContentEditable(el, binding.text)
-    return
+  if (!insideTerminal) {
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      insertIntoTextField(el, binding.text)
+      return
+    }
+    if (el && el.isContentEditable) {
+      insertIntoContentEditable(el, binding.text)
+      return
+    }
   }
 
   const term = ctx.terminal.active()
