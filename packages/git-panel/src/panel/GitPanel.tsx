@@ -146,6 +146,17 @@ export function GitPanel({
   };
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+
+  const reportAiError = (msg: string, e?: unknown): void => {
+    setAiError(msg);
+    const err = e instanceof Error ? e : undefined;
+    ui.toast({
+      kind: "error",
+      title: "commit message",
+      message: msg,
+      details: err?.stack,
+    });
+  };
   const [branchesOpen, setBranchesOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [pullOpen, setPullOpen] = useState(false);
@@ -388,17 +399,17 @@ export function GitPanel({
     const paths =
       checkedPaths.length > 0 ? checkedPaths : files.map((f) => f.path);
     if (paths.length === 0) {
-      setAiError("nothing to summarize");
+      reportAiError("nothing to summarize");
       return;
     }
 
     const { source, provider, model, baseUrl } = binding;
     if (!provider.trim()) {
-      setAiError("pick an AI provider in settings → extensions → git panel");
+      reportAiError("pick an AI provider in settings → extensions → git panel");
       return;
     }
     if (!model.trim()) {
-      setAiError("pick a model in settings → extensions → git panel");
+      reportAiError("pick a model in settings → extensions → git panel");
       return;
     }
 
@@ -407,11 +418,11 @@ export function GitPanel({
       try {
         customKey = await secrets.get(`ai.commit.${provider}.apiKey`);
       } catch (e) {
-        setAiError((e as Error).message);
+        reportAiError((e as Error).message, e);
         return;
       }
       if (!customKey || !customKey.trim()) {
-        setAiError(
+        reportAiError(
           `${provider} api key not set — open settings → extensions → git panel`,
         );
         return;
@@ -437,7 +448,7 @@ export function GitPanel({
       }
     }
     if (!payload) {
-      setAiError("no diff to summarize");
+      reportAiError("no diff to summarize");
       return;
     }
     if (truncated) payload += "\n[diff truncated]\n";
@@ -473,7 +484,7 @@ export function GitPanel({
         }
       } catch (err) {
         if (controller.signal.aborted) return;
-        setAiError(err instanceof Error ? err.message : String(err));
+        reportAiError(err instanceof Error ? err.message : String(err), err);
       } finally {
         aiCancelRef.current = null;
         setAiBusy(false);
