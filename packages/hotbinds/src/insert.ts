@@ -141,15 +141,12 @@ export async function fire(ctx: ExtCtx, binding: Binding): Promise<void> {
   }
 
   try {
-    await term.insertAtPrompt(binding.text)
-    if (binding.submit) {
-      // Submit by sending the Enter key. `write('\n')` is unreliable here:
-      // some hosts/PTYs don't translate LF to a line submit (real Enter
-      // sends CR, then the line discipline maps it). sendKey('enter') is
-      // unambiguous; fall back to a CR write if the host doesn't expose it.
-      if (typeof term.sendKey === 'function') await term.sendKey('enter')
-      else await term.write('\r')
-    }
+    // Run mode: write the whole line including the trailing LF in one call.
+    // This is the same path file-browser uses for `cd <path>\n` and the host
+    // treats the LF as a line submit (newline goes through the PTY).
+    // Insert mode: drop text at the prompt without submitting.
+    if (binding.submit) await term.write(binding.text + '\n')
+    else await term.insertAtPrompt(binding.text)
   } catch (err) {
     ctx.logger.error('hotbinds: failed to write to terminal', err)
     ctx.ui.toast({ kind: 'error', message: 'Hotbinds: failed to write to terminal' })
