@@ -130,6 +130,7 @@ export interface MtGit {
     cwd: string,
   ) => Promise<{ stdout: string; stderr: string; conflict: boolean }>;
   discardAll: (cwd: string) => Promise<void>;
+  discardPaths?: (cwd: string, paths: string[]) => Promise<void>;
   listConflicts: (cwd: string) => Promise<ConflictFileEntry[]>;
   readConflictFile: (
     cwd: string,

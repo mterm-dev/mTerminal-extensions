@@ -173,6 +173,29 @@ export function GitPanel({
     }
   };
 
+  const rollbackFile = async (f: GitFile) => {
+    if (!cwd) return;
+    const verb = f.untracked ? "delete untracked file" : "discard local changes to";
+    const ok = window.confirm(`${verb} '${f.path}'?\n\nThis cannot be undone.`);
+    if (!ok) return;
+    setActionError(null);
+    setActionInfo(null);
+    try {
+      await runMutation(async (api) => {
+        if (typeof api.discardPaths !== "function") {
+          throw new Error(
+            "host does not implement mt.git.discardPaths — update mTerminal to use per-file rollback",
+          );
+        }
+        await api.discardPaths(cwd, [f.path]);
+      });
+      setPathsChecked([f.path], false);
+      setActionInfo(`rolled back ${f.path}`);
+    } catch (e) {
+      setActionError((e as Error).message);
+    }
+  };
+
   const toggleDir = async (node: TreeNode) => {
     const paths = collectFilePaths(node);
     if (paths.length === 0) return;
@@ -674,6 +697,7 @@ export function GitPanel({
                           untracked: f.untracked,
                         },
                       }),
+                    onRollback: (f) => void rollbackFile(f),
                   })
                 : files.map((f) => (
                     <FileRow
@@ -694,6 +718,7 @@ export function GitPanel({
                           },
                         })
                       }
+                      onRollback={() => void rollbackFile(f)}
                     />
                   ))}
             </div>

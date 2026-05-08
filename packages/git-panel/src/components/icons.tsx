@@ -217,6 +217,15 @@ export function CheckIcon() {
   );
 }
 
+export function RollbackIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <polyline points="3 4 3 9 8 9" />
+    </svg>
+  );
+}
+
 export function FolderIcon(_: { open: boolean }) {
   return (
     <span className="git-folder-icon" aria-hidden="true">
