@@ -13,7 +13,11 @@
     "build": "pnpm -r --if-present run build",
     "typecheck": "pnpm -r --if-present run typecheck",
     "test": "pnpm -r --if-present run test",
-    "clean": "pnpm -r exec rm -rf dist node_modules && rm -rf node_modules"
+    "clean": "pnpm -r exec rm -rf dist node_modules && rm -rf node_modules",
+    "release": "node scripts/release.mjs",
+    "release:patch": "node scripts/release.mjs patch",
+    "release:minor": "node scripts/release.mjs minor",
+    "release:major": "node scripts/release.mjs major"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
