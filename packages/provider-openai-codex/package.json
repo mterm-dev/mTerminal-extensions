@@ -4,6 +4,7 @@
   "description": "OpenAI Codex AI provider for mTerminal — bundles @openai/codex-sdk",
   "license": "MIT",
   "type": "module",
+  "main": "dist/main.cjs",
   "renderer": "dist/renderer.mjs",
   "engines": {
     "mterminal-api": "^1.4.0"
