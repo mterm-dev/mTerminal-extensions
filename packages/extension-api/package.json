@@ -35,11 +35,5 @@
   ],
   "publishConfig": {
     "access": "public"
-  },
-  "mterminal": {
-    "publisher": {
-      "authorId": "gh-61193738",
-      "keyId": "gh-61193738:key1"
-    }
   }
 }

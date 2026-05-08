@@ -1,0 +1,51 @@
+name: publish-npm
+
+on:
+  push:
+    tags:
+      - 'extension-api-v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Parse tag
+        id: parse
+        run: |
+          tag="${GITHUB_REF##refs/tags/}"
+          version="${tag##*-v}"
+          if [ -z "$version" ]; then
+            echo "::error::Invalid tag format. Expected 'extension-api-v<version>', got '$tag'"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Set version from tag
+        working-directory: packages/extension-api
+        env:
+          VERSION: ${{ steps.parse.outputs.version }}
+        run: |
+          node <<'EOF'
+          const fs = require('node:fs');
+          const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          p.version = process.env.VERSION;
+          fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          console.log(`set ${p.name} version to ${p.version}`);
+          EOF
+
+      - name: Publish to npm
+        working-directory: packages/extension-api
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: pnpm publish --no-git-checks --access public
