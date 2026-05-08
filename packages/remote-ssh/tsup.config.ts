@@ -11,7 +11,8 @@ export default defineConfig([
     clean: true,
     splitting: false,
     sourcemap: true,
-    external: ['electron', 'ssh2'],
+    external: ['electron', 'cpu-features', /\.node$/],
+    noExternal: ['ssh2', 'asn1', 'bcrypt-pbkdf'],
   },
   {
     entry: { renderer: 'src/renderer.tsx' },
