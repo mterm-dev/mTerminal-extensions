@@ -106,8 +106,11 @@ export interface ExtCtx {
     }): Promise<T | undefined>
     toast(opts: {
       kind?: 'info' | 'success' | 'warn' | 'error'
+      title?: string
       message: string
+      details?: string
       durationMs?: number
+      dismissible?: boolean
     }): void
   }
   subscribe(d: { dispose(): void } | (() => void)): void

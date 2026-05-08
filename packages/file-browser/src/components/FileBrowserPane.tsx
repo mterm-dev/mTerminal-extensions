@@ -16,9 +16,16 @@ export interface CtxBridge {
     on?(channel: string, cb: (payload: unknown) => void): { dispose(): void }
   }
   ui: {
-    confirm(opts: { title: string; message: string; confirmLabel?: string; cancelLabel?: string }): Promise<boolean>
+    confirm(opts: { title: string; message: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }): Promise<boolean>
     prompt(opts: { title: string; message?: string; placeholder?: string; defaultValue?: string }): Promise<string | undefined>
-    toast(opts: { kind?: 'info' | 'success' | 'warn' | 'error'; message: string }): void
+    toast(opts: {
+      kind?: 'info' | 'success' | 'warn' | 'error'
+      title?: string
+      message: string
+      details?: string
+      durationMs?: number
+      dismissible?: boolean
+    }): void
   }
   terminal: {
     active(): {
@@ -134,7 +141,12 @@ export function FileBrowserPane(props: PaneProps): React.JSX.Element {
     try {
       await fb.mkdir(state.cwd, name)
     } catch (err) {
-      ctx.ui.toast({ kind: 'error', message: (err as Error).message })
+      ctx.ui.toast({
+        kind: 'error',
+        title: 'mkdir failed',
+        message: (err as Error).message,
+        details: (err as Error).stack,
+      })
     }
   }, [ctx, fb, state.cwd])
 
@@ -148,7 +160,12 @@ export function FileBrowserPane(props: PaneProps): React.JSX.Element {
     try {
       await fb.touch(state.cwd, name)
     } catch (err) {
-      ctx.ui.toast({ kind: 'error', message: (err as Error).message })
+      ctx.ui.toast({
+        kind: 'error',
+        title: 'create file failed',
+        message: (err as Error).message,
+        details: (err as Error).stack,
+      })
     }
   }, [ctx, fb, state.cwd])
 
@@ -214,7 +231,12 @@ export function FileBrowserPane(props: PaneProps): React.JSX.Element {
       try {
         await fb.rename(node.path, target)
       } catch (err) {
-        ctx.ui.toast({ kind: 'error', message: (err as Error).message })
+        ctx.ui.toast({
+          kind: 'error',
+          title: 'rename failed',
+          message: (err as Error).message,
+          details: (err as Error).stack,
+        })
       }
     },
     [backend, ctx, fb],
@@ -226,12 +248,18 @@ export function FileBrowserPane(props: PaneProps): React.JSX.Element {
         title: 'delete',
         message: `delete ${node.name}?${node.kind === 'dir' ? ' (recursive)' : ''}`,
         confirmLabel: 'delete',
+        danger: true,
       })
       if (!confirm) return
       try {
         await fb.remove(node.path, node.kind === 'dir')
       } catch (err) {
-        ctx.ui.toast({ kind: 'error', message: (err as Error).message })
+        ctx.ui.toast({
+          kind: 'error',
+          title: 'delete failed',
+          message: (err as Error).message,
+          details: (err as Error).stack,
+        })
       }
     },
     [ctx, fb],
@@ -315,7 +343,12 @@ export function FileBrowserPane(props: PaneProps): React.JSX.Element {
         }
         if (clip.mode === 'cut') onClipboard(null)
       } catch (err) {
-        ctx.ui.toast({ kind: 'error', message: (err as Error).message })
+        ctx.ui.toast({
+          kind: 'error',
+          title: 'paste failed',
+          message: (err as Error).message,
+          details: (err as Error).stack,
+        })
       }
     },
     [backend, ctx, fb, onClipboard, state.clipboard],
@@ -346,7 +379,12 @@ export function FileBrowserPane(props: PaneProps): React.JSX.Element {
                 label: 'open in default app',
                 onClick: () => {
                   void fb.openDefault(node.path).catch((err) =>
-                    ctx.ui.toast({ kind: 'error', message: (err as Error).message }),
+                    ctx.ui.toast({
+                      kind: 'error',
+                      title: 'open failed',
+                      message: (err as Error).message,
+                      details: (err as Error).stack,
+                    }),
                   )
                 },
               } as MenuItem,

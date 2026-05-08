@@ -61,12 +61,20 @@ interface ExtCtx {
     register(k: { command: string; key: string }): { dispose(): void }
   }
   ui: {
-    toast(opts: { kind?: 'info' | 'success' | 'warn' | 'error'; message: string }): void
+    toast(opts: {
+      kind?: 'info' | 'success' | 'warn' | 'error'
+      title?: string
+      message: string
+      details?: string
+      durationMs?: number
+      dismissible?: boolean
+    }): void
     confirm(opts: {
       title: string
       message: string
       confirmLabel?: string
       cancelLabel?: string
+      danger?: boolean
     }): Promise<boolean>
   }
   secrets: {
@@ -414,7 +422,9 @@ function PanelHarness({ ctx }: PanelHarnessProps): React.JSX.Element {
       } catch (err) {
         ctx.ui.toast({
           kind: 'error',
-          message: `failed to open terminal: ${(err as Error).message}`,
+          title: 'open terminal failed',
+          message: (err as Error).message,
+          details: (err as Error).stack,
         })
       }
     },
@@ -433,7 +443,9 @@ function PanelHarness({ ctx }: PanelHarnessProps): React.JSX.Element {
       } catch (err) {
         ctx.ui.toast({
           kind: 'error',
-          message: `failed to open files: ${(err as Error).message}`,
+          title: 'open files failed',
+          message: (err as Error).message,
+          details: (err as Error).stack,
         })
       }
     },
@@ -455,6 +467,7 @@ function PanelHarness({ ctx }: PanelHarnessProps): React.JSX.Element {
         title: 'delete host',
         message: `delete "${host.name || host.host}"?`,
         confirmLabel: 'delete',
+        danger: true,
       })
       if (!ok) return
       await reg.deleteHost(host.id)
@@ -510,6 +523,7 @@ function PanelHarness({ ctx }: PanelHarnessProps): React.JSX.Element {
         title: 'delete group',
         message: `delete group "${group.name}"? hosts will become ungrouped.`,
         confirmLabel: 'delete',
+        danger: true,
       })
       if (!ok) return
       await reg.deleteGroup(group.id)

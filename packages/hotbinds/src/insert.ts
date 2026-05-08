@@ -149,6 +149,11 @@ export async function fire(ctx: ExtCtx, binding: Binding): Promise<void> {
     else await term.insertAtPrompt(binding.text)
   } catch (err) {
     ctx.logger.error('hotbinds: failed to write to terminal', err)
-    ctx.ui.toast({ kind: 'error', message: 'Hotbinds: failed to write to terminal' })
+    ctx.ui.toast({
+      kind: 'error',
+      title: 'hotbinds',
+      message: 'failed to write to terminal',
+      details: err instanceof Error ? err.stack : String(err),
+    })
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@mterminal/ext-hotbinds",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Global hotkey snippets — fire predefined text into the focused input or active terminal",
   "license": "MIT",
   "type": "module",

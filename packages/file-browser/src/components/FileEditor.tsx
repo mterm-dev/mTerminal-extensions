@@ -69,8 +69,15 @@ interface CtxBridge {
     invoke<T = unknown>(channel: string, args?: unknown): Promise<T>
   }
   ui: {
-    confirm(opts: { title: string; message: string; confirmLabel?: string; cancelLabel?: string }): Promise<boolean>
-    toast(opts: { kind?: 'info' | 'success' | 'warn' | 'error'; message: string }): void
+    confirm(opts: { title: string; message: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }): Promise<boolean>
+    toast(opts: {
+      kind?: 'info' | 'success' | 'warn' | 'error'
+      title?: string
+      message: string
+      details?: string
+      durationMs?: number
+      dismissible?: boolean
+    }): void
   }
 }
 
@@ -462,7 +469,12 @@ export function FileEditor({ ctx, backend, path, onClose }: Props): React.JSX.El
       ctx.ui.toast({ kind: 'success', message: `saved ${fileName}` })
       return true
     } catch (err) {
-      ctx.ui.toast({ kind: 'error', message: (err as Error).message })
+      ctx.ui.toast({
+        kind: 'error',
+        title: 'save failed',
+        message: (err as Error).message,
+        details: (err as Error).stack,
+      })
       return false
     } finally {
       setSaving(false)

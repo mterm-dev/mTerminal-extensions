@@ -121,6 +121,7 @@ function GitPanelMount({ ctx }: { ctx: ExtensionContext }) {
       binding={binding}
       ai={ctx.ai}
       secrets={ctx.secrets}
+      ui={ctx.ui}
       height={height}
       onResizeHeight={(h) => {
         setHeight(h);

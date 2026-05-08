@@ -806,9 +806,27 @@ export interface ModalController {
 
 export interface UiApi {
   openModal<T = unknown>(spec: ModalSpec): Promise<T | undefined>
-  confirm(opts: { title: string; message: string; confirmLabel?: string; cancelLabel?: string }): Promise<boolean>
+  confirm(opts: {
+    title: string
+    message: string
+    confirmLabel?: string
+    cancelLabel?: string
+    /** When true, the confirm button uses the danger style (red). */
+    danger?: boolean
+  }): Promise<boolean>
   prompt(opts: { title: string; message?: string; placeholder?: string; defaultValue?: string }): Promise<string | undefined>
-  toast(opts: { kind?: 'info' | 'success' | 'warn' | 'error'; message: string; durationMs?: number }): void
+  toast(opts: {
+    kind?: 'info' | 'success' | 'warn' | 'error'
+    /** Optional bold heading shown above the message. */
+    title?: string
+    message: string
+    /** Optional collapsible block — useful for stack traces or long error context. */
+    details?: string
+    /** Auto-dismiss after this many ms. `<= 0` means sticky (no auto-dismiss). Default: 4500. */
+    durationMs?: number
+    /** Show the close button. Default: true. */
+    dismissible?: boolean
+  }): void
 }
 
 export interface NotifyApi {

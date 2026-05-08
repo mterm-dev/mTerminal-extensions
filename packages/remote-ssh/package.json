@@ -1,6 +1,6 @@
 {
   "name": "@mterminal/ext-remote-ssh",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Remote SSH host registry, terminal sessions, and SFTP filesystem service",
   "license": "MIT",
   "type": "module",

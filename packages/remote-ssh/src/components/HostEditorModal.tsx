@@ -2,7 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react'
 import type { HostMeta, SshAuthMode, SshKey } from '../shared/types'
 
 interface UiHelpers {
-  toast(opts: { kind?: 'info' | 'success' | 'warn' | 'error'; message: string }): void
+  toast(opts: {
+    kind?: 'info' | 'success' | 'warn' | 'error'
+    title?: string
+    message: string
+    details?: string
+    durationMs?: number
+    dismissible?: boolean
+  }): void
 }
 
 interface SecretsApi {

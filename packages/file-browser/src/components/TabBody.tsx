@@ -76,7 +76,12 @@ export function TabBody({ ctx, tabId, initial }: Props): React.JSX.Element {
         setState((s) => (s.cwd ? s : { ...s, cwd: home }))
       } catch (err) {
         if (!cancelled) {
-          ctx.ui.toast({ kind: 'error', message: `cannot open: ${(err as Error).message}` })
+          ctx.ui.toast({
+            kind: 'error',
+            title: 'open failed',
+            message: (err as Error).message,
+            details: (err as Error).stack,
+          })
         }
       }
     })()

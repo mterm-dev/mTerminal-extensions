@@ -60,6 +60,24 @@ const FEW_SHOT_DIFF = `Generate a commit message for the following staged change
 
 const FEW_SHOT_COMMIT = `refactor: rename port to PORT and read from env`;
 
+interface UiBridge {
+  confirm(opts: {
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    danger?: boolean;
+  }): Promise<boolean>;
+  toast(opts: {
+    kind?: "info" | "success" | "warn" | "error";
+    title?: string;
+    message: string;
+    details?: string;
+    durationMs?: number;
+    dismissible?: boolean;
+  }): void;
+}
+
 interface Props {
   cwd: string | undefined;
   collapsed: boolean;
@@ -70,6 +88,7 @@ interface Props {
   binding: AiBindingConfig;
   ai: AiApi;
   secrets: SecretsApi;
+  ui: UiBridge;
   height: number;
   onResizeHeight: (h: number) => void;
   msgHeight: number;
@@ -94,6 +113,7 @@ export function GitPanel({
   binding,
   ai,
   secrets,
+  ui,
   height,
   onResizeHeight,
   msgHeight,
@@ -113,6 +133,17 @@ export function GitPanel({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionInfo, setActionInfo] = useState<string | null>(null);
+
+  const reportActionError = (title: string, e: unknown): void => {
+    const err = e instanceof Error ? e : new Error(String(e));
+    setActionError(err.message);
+    ui.toast({
+      kind: "error",
+      title,
+      message: err.message,
+      details: err instanceof Error ? err.stack : undefined,
+    });
+  };
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [branchesOpen, setBranchesOpen] = useState(false);
@@ -178,7 +209,7 @@ export function GitPanel({
         isChecked ? api.unstage(cwd!, ps) : api.stage(cwd!, ps),
       );
     } catch (e) {
-      setActionError((e as Error).message);
+      reportActionError(isChecked ? "unstage failed" : "stage failed", e);
     }
   };
 
@@ -187,7 +218,12 @@ export function GitPanel({
     const verb = f.untracked
       ? "delete untracked file"
       : "discard local changes to";
-    const ok = window.confirm(`${verb} '${f.path}'?\n\nThis cannot be undone.`);
+    const ok = await ui.confirm({
+      title: f.untracked ? "delete untracked file" : "discard changes",
+      message: `${verb} '${f.path}'?\n\nThis cannot be undone.`,
+      confirmLabel: f.untracked ? "delete" : "discard",
+      danger: true,
+    });
     if (!ok) return;
     setActionError(null);
     setActionInfo(null);
@@ -203,7 +239,7 @@ export function GitPanel({
       setPathsChecked([f.path], false);
       setActionInfo(`rolled back ${f.path}`);
     } catch (e) {
-      setActionError((e as Error).message);
+      reportActionError(f.untracked ? "delete failed" : "rollback failed", e);
     }
   };
 
@@ -225,7 +261,7 @@ export function GitPanel({
         shouldCheck ? api.stage(cwd!, ps) : api.unstage(cwd!, ps),
       );
     } catch (e) {
-      setActionError((e as Error).message);
+      reportActionError(shouldCheck ? "stage failed" : "unstage failed", e);
     }
   };
 
@@ -250,7 +286,7 @@ export function GitPanel({
         shouldCheck ? api.stage(cwd!, ps) : api.unstage(cwd!, ps),
       );
     } catch (e) {
-      setActionError((e as Error).message);
+      reportActionError(shouldCheck ? "stage failed" : "unstage failed", e);
     }
   };
 
@@ -277,7 +313,7 @@ export function GitPanel({
       await fn();
       return true;
     } catch (e) {
-      setActionError((e as Error).message);
+      reportActionError(`${name} failed`, e);
       return false;
     } finally {
       setBusyAction(null);
@@ -870,7 +906,7 @@ export function GitPanel({
             if (info) setActionInfo(info);
             void refresh();
           }}
-          onError={(msg) => setActionError(msg)}
+          onError={(msg) => reportActionError("git error", msg)}
         />
       )}
 
@@ -888,7 +924,7 @@ export function GitPanel({
             setActionInfo(info);
             void refresh();
           }}
-          onError={(msg) => setActionError(msg)}
+          onError={(msg) => reportActionError("git error", msg)}
           onConflicts={(info) => {
             setActionInfo(info);
             void refresh();
@@ -906,7 +942,7 @@ export function GitPanel({
             if (info) setActionInfo(info);
             void refresh();
           }}
-          onError={(msg) => setActionError(msg)}
+          onError={(msg) => reportActionError("git error", msg)}
         />
       )}
 
@@ -926,7 +962,7 @@ export function GitPanel({
             setActionInfo(info);
             void refresh();
           }}
-          onError={(msg) => setActionError(msg)}
+          onError={(msg) => reportActionError("git error", msg)}
         />
       )}
     </div>

@@ -67,9 +67,16 @@ interface ExtCtx {
   }
   services: Record<string, { available: boolean; impl: unknown }>
   ui: {
-    confirm(opts: { title: string; message: string; confirmLabel?: string; cancelLabel?: string }): Promise<boolean>
+    confirm(opts: { title: string; message: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }): Promise<boolean>
     prompt(opts: { title: string; message?: string; placeholder?: string; defaultValue?: string }): Promise<string | undefined>
-    toast(opts: { kind?: 'info' | 'success' | 'warn' | 'error'; message: string }): void
+    toast(opts: {
+      kind?: 'info' | 'success' | 'warn' | 'error'
+      title?: string
+      message: string
+      details?: string
+      durationMs?: number
+      dismissible?: boolean
+    }): void
   }
   terminal: {
     active(): {
