@@ -1,4 +1,4 @@
-import { promises as fsp } from 'node:fs'
+import { promises as fsp, watch as fsWatch, type FSWatcher } from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { shell } from 'electron'
@@ -16,6 +16,7 @@ interface MainCtx {
     handle(channel: string, fn: (args: unknown) => unknown | Promise<unknown>): {
       dispose(): void
     }
+    emit?(channel: string, payload: unknown): void
   }
   settings: {
     get<T = unknown>(key: string): T | undefined
@@ -82,6 +83,38 @@ async function resolveSymlinkKind(absPath: string): Promise<FileEntryKind | unde
   }
 }
 
+async function buildEntryLocal(
+  cwd: string,
+  d: { name: string; isDirectory(): boolean; isFile(): boolean; isSymbolicLink(): boolean },
+): Promise<FileEntry> {
+  const abs = path.join(cwd, d.name)
+  const kind = localKindFromDirent(d)
+  const isHidden = isHiddenName(d.name)
+  let size: number | null = null
+  let mtimeMs: number | null = null
+  let resolvedKind: FileEntryKind | undefined
+  let symlinkTarget: string | null | undefined
+  try {
+    const st = await fsp.lstat(abs)
+    size = kind === 'file' ? st.size : null
+    mtimeMs = st.mtimeMs
+  } catch {
+    // ignore
+  }
+  if (kind === 'symlink') {
+    const [linkRes, kindRes] = await Promise.all([
+      fsp.readlink(abs).then(
+        (v) => v as string | null,
+        () => null,
+      ),
+      resolveSymlinkKind(abs),
+    ])
+    symlinkTarget = linkRes
+    resolvedKind = kindRes
+  }
+  return { name: d.name, path: abs, kind, size, mtimeMs, isHidden, symlinkTarget, resolvedKind }
+}
+
 async function listLocal(args: { cwd: string; showHidden: boolean }): Promise<FileListResult> {
   const cwd = path.resolve(args.cwd)
   let dirents
@@ -90,47 +123,10 @@ async function listLocal(args: { cwd: string; showHidden: boolean }): Promise<Fi
   } catch (err) {
     throw mapNodeErr(err)
   }
-  const entries: FileEntry[] = []
-  let truncated = false
-  for (const d of dirents) {
-    if (entries.length >= maxEntriesPerDir) {
-      truncated = true
-      break
-    }
-    const isHidden = isHiddenName(d.name)
-    if (!args.showHidden && isHidden) continue
-    const abs = path.join(cwd, d.name)
-    const kind = localKindFromDirent(d)
-    let size: number | null = null
-    let mtimeMs: number | null = null
-    let resolvedKind: FileEntryKind | undefined
-    let symlinkTarget: string | null | undefined
-    try {
-      const st = await fsp.lstat(abs)
-      size = kind === 'file' ? st.size : null
-      mtimeMs = st.mtimeMs
-    } catch {
-      // ignore
-    }
-    if (kind === 'symlink') {
-      try {
-        symlinkTarget = await fsp.readlink(abs)
-      } catch {
-        symlinkTarget = null
-      }
-      resolvedKind = await resolveSymlinkKind(abs)
-    }
-    entries.push({
-      name: d.name,
-      path: abs,
-      kind,
-      size,
-      mtimeMs,
-      isHidden,
-      symlinkTarget,
-      resolvedKind,
-    })
-  }
+  const visible = args.showHidden ? dirents : dirents.filter((d) => !isHiddenName(d.name))
+  const truncated = visible.length > maxEntriesPerDir
+  const slice = truncated ? visible.slice(0, maxEntriesPerDir) : visible
+  const entries = await Promise.all(slice.map((d) => buildEntryLocal(cwd, d)))
   const parent = path.dirname(cwd)
   return {
     cwd,
@@ -161,47 +157,10 @@ const DEFAULT_TREE_MAX_NODES = 5000
 async function listEntriesLocal(args: { cwd: string; showHidden: boolean }): Promise<TreeDir> {
   try {
     const dirents = await fsp.readdir(args.cwd, { withFileTypes: true })
-    const entries: FileEntry[] = []
-    let truncated = false
-    for (const d of dirents) {
-      if (entries.length >= maxEntriesPerDir) {
-        truncated = true
-        break
-      }
-      const isHidden = isHiddenName(d.name)
-      if (!args.showHidden && isHidden) continue
-      const abs = path.join(args.cwd, d.name)
-      const kind = localKindFromDirent(d)
-      let size: number | null = null
-      let mtimeMs: number | null = null
-      let resolvedKind: FileEntryKind | undefined
-      let symlinkTarget: string | null | undefined
-      try {
-        const st = await fsp.lstat(abs)
-        size = kind === 'file' ? st.size : null
-        mtimeMs = st.mtimeMs
-      } catch {
-        // ignore
-      }
-      if (kind === 'symlink') {
-        try {
-          symlinkTarget = await fsp.readlink(abs)
-        } catch {
-          symlinkTarget = null
-        }
-        resolvedKind = await resolveSymlinkKind(abs)
-      }
-      entries.push({
-        name: d.name,
-        path: abs,
-        kind,
-        size,
-        mtimeMs,
-        isHidden,
-        symlinkTarget,
-        resolvedKind,
-      })
-    }
+    const visible = args.showHidden ? dirents : dirents.filter((d) => !isHiddenName(d.name))
+    const truncated = visible.length > maxEntriesPerDir
+    const slice = truncated ? visible.slice(0, maxEntriesPerDir) : visible
+    const entries = await Promise.all(slice.map((d) => buildEntryLocal(args.cwd, d)))
     return { entries, truncated: truncated || undefined }
   } catch (err) {
     return { entries: [], error: (err as Error).message }
@@ -220,11 +179,23 @@ async function treeLocal(args: {
   const maxNodes =
     typeof args.maxNodes === 'number' && args.maxNodes > 0 ? args.maxNodes : DEFAULT_TREE_MAX_NODES
   const dirs: Record<string, TreeDir> = {}
+  const visitedReal = new Set<string>()
   let nodeCount = 0
   let reachedCap = false
 
   async function walk(dirPath: string, depth: number): Promise<void> {
     if (dirs[dirPath]) return
+    let real: string
+    try {
+      real = await fsp.realpath(dirPath)
+    } catch {
+      real = dirPath
+    }
+    if (visitedReal.has(real)) {
+      dirs[dirPath] = { entries: [] }
+      return
+    }
+    visitedReal.add(real)
     const dir = await listEntriesLocal({ cwd: dirPath, showHidden: args.showHidden })
     dirs[dirPath] = dir
     nodeCount += dir.entries.length
@@ -442,6 +413,73 @@ async function writeLocal(args: { path: string; content: string }): Promise<void
   }
 }
 
+interface WatcherEntry {
+  count: number
+  watcher: FSWatcher
+  debounce: NodeJS.Timeout | null
+}
+
+const watchers = new Map<string, WatcherEntry>()
+const WATCH_DEBOUNCE_MS = 200
+
+function addWatch(ctx: MainCtx, target: string): void {
+  const abs = path.resolve(target)
+  const existing = watchers.get(abs)
+  if (existing) {
+    existing.count++
+    return
+  }
+  let watcher: FSWatcher
+  try {
+    watcher = fsWatch(abs, { persistent: false })
+  } catch (err) {
+    ctx.logger.warn('file-browser: cannot watch', abs, (err as Error).message)
+    return
+  }
+  const entry: WatcherEntry = { count: 1, watcher, debounce: null }
+  watcher.on('error', (err) => {
+    ctx.logger.warn('file-browser: watcher error', abs, err.message)
+    entry.watcher.close()
+    watchers.delete(abs)
+  })
+  watcher.on('change', () => {
+    if (entry.debounce) clearTimeout(entry.debounce)
+    entry.debounce = setTimeout(() => {
+      entry.debounce = null
+      ctx.ipc.emit?.('fs:dir-changed', { path: abs })
+    }, WATCH_DEBOUNCE_MS)
+  })
+  watchers.set(abs, entry)
+}
+
+function removeWatch(target: string): void {
+  const abs = path.resolve(target)
+  const entry = watchers.get(abs)
+  if (!entry) return
+  entry.count--
+  if (entry.count <= 0) {
+    if (entry.debounce) clearTimeout(entry.debounce)
+    try {
+      entry.watcher.close()
+    } catch {
+      // ignore
+    }
+    watchers.delete(abs)
+  }
+}
+
+function disposeAllWatchers(): void {
+  for (const entry of watchers.values()) {
+    if (entry.debounce) clearTimeout(entry.debounce)
+    try {
+      entry.watcher.close()
+    } catch {
+      // ignore
+    }
+  }
+  watchers.clear()
+}
+
 export function activate(ctx: MainCtx): void {
   ctx.logger.info('file-browser main activated')
 
@@ -476,8 +514,21 @@ export function activate(ctx: MainCtx): void {
   ctx.subscribe(
     ctx.ipc.handle('fs:write', (a) => writeLocal(a as { path: string; content: string })),
   )
+  ctx.subscribe(
+    ctx.ipc.handle('fs:watch-dir', (a) => {
+      addWatch(ctx, (a as { path: string }).path)
+      return undefined
+    }),
+  )
+  ctx.subscribe(
+    ctx.ipc.handle('fs:unwatch-dir', (a) => {
+      removeWatch((a as { path: string }).path)
+      return undefined
+    }),
+  )
+  ctx.subscribe(disposeAllWatchers)
 }
 
 export function deactivate(): void {
-  /* nothing to clean up */
+  disposeAllWatchers()
 }

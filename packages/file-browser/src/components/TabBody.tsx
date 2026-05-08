@@ -10,7 +10,10 @@ import {
 } from '../shared/types'
 
 interface ExtCtx {
-  ipc: { invoke<T = unknown>(channel: string, args?: unknown): Promise<T> }
+  ipc: {
+    invoke<T = unknown>(channel: string, args?: unknown): Promise<T>
+    on?(channel: string, cb: (payload: unknown) => void): { dispose(): void }
+  }
   services: Record<string, { available: boolean; impl: unknown }>
   ui: CtxBridge['ui']
   terminal: CtxBridge['terminal']
@@ -111,7 +114,6 @@ export function TabBody({ ctx, tabId, initial }: Props): React.JSX.Element {
         activeTabCwd={ctx.workspace.cwd()}
         onPatchState={onPatchState}
         onClipboard={onClipboard}
-        onClose={() => ctx.tabs.close(tabId)}
         onOpenEditor={onOpenEditor}
       />
       {editing && (

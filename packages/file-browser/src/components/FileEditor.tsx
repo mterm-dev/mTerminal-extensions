@@ -33,7 +33,6 @@ import { vue } from '@codemirror/lang-vue'
 import { sass } from '@codemirror/lang-sass'
 import { less } from '@codemirror/lang-less'
 import { shell } from '@codemirror/legacy-modes/mode/shell'
-import { dockerFile } from '@codemirror/legacy-modes/mode/dockerfile'
 import { ruby } from '@codemirror/legacy-modes/mode/ruby'
 import { lua } from '@codemirror/legacy-modes/mode/lua'
 import { swift } from '@codemirror/legacy-modes/mode/swift'
@@ -447,8 +446,12 @@ export function FileEditor({ ctx, backend, path, onClose }: Props): React.JSX.El
   dirtyRef.current = dirty
   const textRef = useRef(text)
   textRef.current = text
+  const originalRef = useRef(original)
+  originalRef.current = original
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
+  const saveRef = useRef<() => Promise<boolean>>(async () => true)
+  const requestCloseRef = useRef<() => Promise<void>>(async () => {})
 
   const save = useCallback(async (): Promise<boolean> => {
     if (!dirtyRef.current) return true
@@ -478,6 +481,9 @@ export function FileEditor({ ctx, backend, path, onClose }: Props): React.JSX.El
     }
     onCloseRef.current()
   }, [ctx, fileName])
+
+  saveRef.current = save
+  requestCloseRef.current = requestClose
 
   useEffect(() => {
     let cancelled = false
@@ -518,14 +524,14 @@ export function FileEditor({ ctx, backend, path, onClose }: Props): React.JSX.El
             key: 'Mod-s',
             preventDefault: true,
             run: () => {
-              void save()
+              void saveRef.current()
               return true
             },
           },
           {
             key: 'Escape',
             run: () => {
-              void requestClose()
+              void requestCloseRef.current()
               return true
             },
           },
@@ -557,7 +563,7 @@ export function FileEditor({ ctx, backend, path, onClose }: Props): React.JSX.El
       }),
     ]
     const view = new EditorView({
-      state: EditorState.create({ doc: original, extensions }),
+      state: EditorState.create({ doc: originalRef.current, extensions }),
       parent: host,
     })
     viewRef.current = view
@@ -566,22 +572,22 @@ export function FileEditor({ ctx, backend, path, onClose }: Props): React.JSX.El
       view.destroy()
       viewRef.current = null
     }
-  }, [loading, error, fileName, original, save, requestClose])
+  }, [loading, error, fileName])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         e.stopPropagation()
-        void requestClose()
+        void requestCloseRef.current()
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
         e.stopPropagation()
-        void save()
+        void saveRef.current()
       }
     }
     document.addEventListener('keydown', onKey, true)
     return () => document.removeEventListener('keydown', onKey, true)
-  }, [requestClose, save])
+  }, [])
 
   return (
     <div
