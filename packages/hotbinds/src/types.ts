@@ -34,6 +34,26 @@ export interface ExtCtx {
       insertAtPrompt(data: string): Promise<void>
     } | null
   }
+  statusBar: {
+    register(item: {
+      id: string
+      align: 'left' | 'right'
+      text?: string | (() => string)
+      icon?: string
+      tooltip?: string
+      onClick?(): void
+      refreshOn?: string[]
+      priority?: number
+    }): { dispose(): void }
+    update(
+      id: string,
+      patch: Partial<{ text: string; icon: string; tooltip: string; onClick: () => void }>,
+    ): void
+  }
+  events: {
+    emit(event: string, payload?: unknown): void
+    on(event: string, cb: (payload: unknown) => void): { dispose(): void }
+  }
   ui: {
     openModal<T = unknown>(spec: {
       title: string

@@ -53,9 +53,33 @@ export function activate(ctx: ExtCtx): void {
     }),
   )
 
+  const REFRESH_EVENT = 'hotbinds:bindings-changed'
+  const countBindings = (): number => {
+    const raw = ctx.settings.get<Binding[]>('bindings')
+    return Array.isArray(raw) ? raw.filter((b) => b && typeof b.key === 'string' && b.key.trim()).length : 0
+  }
+
+  ctx.subscribe(
+    ctx.statusBar.register({
+      id: 'hotbinds.status',
+      align: 'right',
+      priority: 50,
+      text: () => {
+        const n = countBindings()
+        return n > 0 ? `⌨ Hotbinds · ${n}` : '⌨ Hotbinds'
+      },
+      tooltip: 'Manage hotbinds (Ctrl+Alt+H)',
+      onClick: () => void openManager(ctx),
+      refreshOn: [REFRESH_EVENT],
+    }),
+  )
+
   ctx.subscribe(
     ctx.settings.onChange((key) => {
-      if (key === 'bindings') applyBindings()
+      if (key === 'bindings') {
+        applyBindings()
+        ctx.events.emit(REFRESH_EVENT)
+      }
     }),
   )
 
