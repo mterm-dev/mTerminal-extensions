@@ -17,7 +17,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk'
-import { defineExtension, type Disposable } from '@mterminal/extension-api'
+import type { Disposable, ExtensionContext } from '@mterminal/extension-api'
 
 interface CompleteReq {
   provider?: string
@@ -43,8 +43,7 @@ interface SdkServiceImpl {
   factory: (overrides?: ConstructorParameters<typeof Anthropic>[0]) => Anthropic
 }
 
-export default defineExtension({
-  async activate(ctx) {
+export async function activate(ctx: ExtensionContext): Promise<void> {
     let client: Anthropic | null = null
     let svcDispose: Disposable | null = null
 
@@ -192,5 +191,8 @@ export default defineExtension({
         svcDispose = null
       },
     })
-  },
-})
+}
+
+export function deactivate(): void {
+  /* ctx.subscribe handlers run automatically on host-side teardown */
+}

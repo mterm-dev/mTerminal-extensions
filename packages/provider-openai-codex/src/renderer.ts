@@ -17,7 +17,7 @@
  */
 
 import { Codex } from '@openai/codex-sdk'
-import { defineExtension, type Disposable } from '@mterminal/extension-api'
+import type { Disposable, ExtensionContext } from '@mterminal/extension-api'
 
 interface CompleteReq {
   provider?: string
@@ -48,8 +48,7 @@ function flattenPrompt(req: CompleteReq): string {
   return parts.join('\n\n')
 }
 
-export default defineExtension({
-  async activate(ctx) {
+export async function activate(ctx: ExtensionContext): Promise<void> {
     let client: Codex | null = null
     let svcDispose: Disposable | null = null
 
@@ -159,5 +158,8 @@ export default defineExtension({
         svcDispose = null
       },
     })
-  },
-})
+}
+
+export function deactivate(): void {
+  /* ctx.subscribe handlers run automatically on host-side teardown */
+}
