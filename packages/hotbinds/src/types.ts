@@ -6,6 +6,13 @@ export interface Binding {
   submit: boolean
 }
 
+export interface TerminalHandleLite {
+  tabId: number
+  write(data: string): Promise<void>
+  insertAtPrompt(data: string): Promise<void>
+  sendKey?(key: 'enter' | 'ctrl-c' | 'ctrl-d' | (string & {})): Promise<void>
+}
+
 export interface ExtCtx {
   id: string
   logger: {
@@ -28,11 +35,12 @@ export interface ExtCtx {
     onChange(cb: (key: string, value: unknown) => void): { dispose(): void }
   }
   terminal: {
-    active(): {
-      tabId: number
-      write(data: string): Promise<void>
-      insertAtPrompt(data: string): Promise<void>
-    } | null
+    active(): TerminalHandleLite | null
+    byId(tabId: number): TerminalHandleLite | null
+    list(): TerminalHandleLite[]
+  }
+  tabs?: {
+    active(): { id: number; type: string } | null
   }
   settingsRenderer: {
     register(spec: {

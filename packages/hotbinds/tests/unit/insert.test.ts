@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fire, isInsideXterm, randomId } from '../../src/insert'
-import type { Binding, ExtCtx } from '../../src/types'
+import { fire, isInsideXterm, randomId, resolveTargetTerminal } from '../../src/insert'
+import type { Binding, ExtCtx, TerminalHandleLite } from '../../src/types'
 
 interface TestCtx {
   ctx: ExtCtx
@@ -11,49 +11,78 @@ interface TestCtx {
   info: ReturnType<typeof vi.fn>
   write: ReturnType<typeof vi.fn>
   insertAtPrompt: ReturnType<typeof vi.fn>
-  setActiveTerminal(t: TestCtx['terminal']): void
-  terminal: { write: TestCtx['write']; insertAtPrompt: TestCtx['insertAtPrompt']; tabId: number } | null
+  sendKey: ReturnType<typeof vi.fn>
+  terminal: TerminalHandleLite | null
+  terminalsById: Map<number, TerminalHandleLite>
+  activeTab: { id: number; type: string } | null
 }
 
-function makeCtx(overrides?: { terminal?: TestCtx['terminal'] }): TestCtx {
+function makeTerminal(tabId: number): TerminalHandleLite & {
+  write: ReturnType<typeof vi.fn>
+  insertAtPrompt: ReturnType<typeof vi.fn>
+  sendKey: ReturnType<typeof vi.fn>
+} {
+  return {
+    tabId,
+    write: vi.fn().mockResolvedValue(undefined),
+    insertAtPrompt: vi.fn().mockResolvedValue(undefined),
+    sendKey: vi.fn().mockResolvedValue(undefined),
+  }
+}
+
+function makeCtx(overrides?: {
+  terminal?: TerminalHandleLite | null
+  terminalsById?: Map<number, TerminalHandleLite>
+  activeTab?: { id: number; type: string } | null
+  noTabsApi?: boolean
+}): TestCtx {
   const toast = vi.fn()
   const warn = vi.fn()
   const error = vi.fn()
   const info = vi.fn()
-  const write = vi.fn().mockResolvedValue(undefined)
-  const insertAtPrompt = vi.fn().mockResolvedValue(undefined)
-  const handle = overrides?.terminal === undefined
-    ? { tabId: 1, write, insertAtPrompt }
-    : overrides.terminal
-  const test = {
+  const handle =
+    overrides?.terminal === undefined
+      ? makeTerminal(1)
+      : overrides.terminal
+  const write =
+    handle && (handle as { write: ReturnType<typeof vi.fn> }).write
+      ? (handle as { write: ReturnType<typeof vi.fn> }).write
+      : vi.fn()
+  const insertAtPrompt =
+    handle && (handle as { insertAtPrompt: ReturnType<typeof vi.fn> }).insertAtPrompt
+      ? (handle as { insertAtPrompt: ReturnType<typeof vi.fn> }).insertAtPrompt
+      : vi.fn()
+  const sendKey =
+    handle && (handle as { sendKey?: ReturnType<typeof vi.fn> }).sendKey
+      ? (handle as { sendKey: ReturnType<typeof vi.fn> }).sendKey
+      : vi.fn()
+  const test: TestCtx = {
+    ctx: undefined as unknown as ExtCtx,
     toast,
     warn,
     error,
     info,
     write,
     insertAtPrompt,
+    sendKey,
     terminal: handle,
-    setActiveTerminal(t: TestCtx['terminal']) {
-      this.terminal = t
-    },
-  } as TestCtx
-  test.ctx = {
+    terminalsById: overrides?.terminalsById ?? new Map(),
+    activeTab: overrides?.activeTab ?? null,
+  }
+  const ctxBase = {
     id: 'hotbinds',
-    logger: {
-      info,
-      warn,
-      error,
-    },
+    logger: { info, warn, error },
     terminal: {
       active: () => test.terminal,
+      byId: (id: number) => test.terminalsById.get(id) ?? null,
+      list: () => Array.from(test.terminalsById.values()),
     },
-    ui: {
-      toast,
-      // openModal is unused in fire()
-      openModal: vi.fn(),
-    },
-    // The remaining ExtCtx surface is unused in fire() — cast through unknown.
-  } as unknown as ExtCtx
+    ui: { toast, openModal: vi.fn() },
+  } as unknown as ExtCtx & { tabs?: { active(): { id: number; type: string } | null } }
+  if (!overrides?.noTabsApi) {
+    ctxBase.tabs = { active: () => test.activeTab }
+  }
+  test.ctx = ctxBase
   return test
 }
 
@@ -78,6 +107,88 @@ describe('randomId', () => {
     const seen = new Set<string>()
     for (let i = 0; i < 100; i++) seen.add(randomId())
     expect(seen.size).toBe(100)
+  })
+})
+
+describe('resolveTargetTerminal', () => {
+  it('prefers the terminal whose tab id matches tabs.active()', () => {
+    const sidebar = makeTerminal(99)
+    const visible = makeTerminal(42)
+    const t = makeCtx({
+      terminal: sidebar,
+      terminalsById: new Map([
+        [99, sidebar],
+        [42, visible],
+      ]),
+      activeTab: { id: 42, type: 'terminal' },
+    })
+
+    const picked = resolveTargetTerminal(t.ctx)
+    expect(picked?.tabId).toBe(42)
+  })
+
+  it('falls back to terminal.active() when active tab is not a terminal', () => {
+    const sidebar = makeTerminal(99)
+    const t = makeCtx({
+      terminal: sidebar,
+      terminalsById: new Map([[99, sidebar]]),
+      // active tab is a settings tab — byId(7) returns null
+      activeTab: { id: 7, type: 'settings' },
+    })
+
+    const picked = resolveTargetTerminal(t.ctx)
+    expect(picked?.tabId).toBe(99)
+  })
+
+  it('falls back to terminal.active() when host has no tabs API at all', () => {
+    const fallback = makeTerminal(5)
+    const t = makeCtx({
+      terminal: fallback,
+      terminalsById: new Map([[5, fallback]]),
+      noTabsApi: true,
+    })
+
+    const picked = resolveTargetTerminal(t.ctx)
+    expect(picked?.tabId).toBe(5)
+  })
+
+  it('uses the only terminal when active() returns null and exactly one exists', () => {
+    const only = makeTerminal(11)
+    const t = makeCtx({
+      terminal: null,
+      terminalsById: new Map([[11, only]]),
+      activeTab: null,
+    })
+
+    const picked = resolveTargetTerminal(t.ctx)
+    expect(picked?.tabId).toBe(11)
+  })
+
+  it('returns null when no terminal can be located', () => {
+    const t = makeCtx({
+      terminal: null,
+      terminalsById: new Map(),
+      activeTab: null,
+    })
+
+    expect(resolveTargetTerminal(t.ctx)).toBeNull()
+  })
+
+  it('does not pick from list() when there are multiple ambiguous terminals', () => {
+    // Two terminals exist, host's active() is null, no active tab -> we
+    // refuse to guess rather than fire into the wrong one.
+    const a = makeTerminal(1)
+    const b = makeTerminal(2)
+    const t = makeCtx({
+      terminal: null,
+      terminalsById: new Map([
+        [1, a],
+        [2, b],
+      ]),
+      activeTab: null,
+    })
+
+    expect(resolveTargetTerminal(t.ctx)).toBeNull()
   })
 })
 
@@ -205,19 +316,44 @@ describe('fire', () => {
     expect(helper.value).toBe('')
   })
 
-  it('appends a newline when submit:true', async () => {
+  it('inserts the text and presses Enter via sendKey when submit:true', async () => {
     const t = makeCtx()
     await fire(t.ctx, bind({ text: 'pwd', submit: true }))
 
-    expect(t.write).toHaveBeenCalledWith('pwd\n')
-    expect(t.insertAtPrompt).not.toHaveBeenCalled()
+    expect(t.insertAtPrompt).toHaveBeenCalledWith('pwd')
+    expect(t.sendKey).toHaveBeenCalledWith('enter')
+    expect(t.write).not.toHaveBeenCalled()
   })
 
-  it('uses insertAtPrompt when submit:false', async () => {
+  it('insertAtPrompt is called in order before sendKey on submit', async () => {
+    const t = makeCtx()
+    await fire(t.ctx, bind({ text: 'pwd', submit: true }))
+
+    const insertOrder = t.insertAtPrompt.mock.invocationCallOrder[0]
+    const enterOrder = t.sendKey.mock.invocationCallOrder[0]
+    expect(insertOrder).toBeLessThan(enterOrder)
+  })
+
+  it('falls back to write("\\r") when sendKey is not exposed by the host', async () => {
+    const term: TerminalHandleLite = {
+      tabId: 7,
+      write: vi.fn().mockResolvedValue(undefined),
+      insertAtPrompt: vi.fn().mockResolvedValue(undefined),
+      // no sendKey
+    }
+    const t = makeCtx({ terminal: term })
+    await fire(t.ctx, bind({ text: 'pwd', submit: true }))
+
+    expect(term.insertAtPrompt).toHaveBeenCalledWith('pwd')
+    expect(term.write).toHaveBeenCalledWith('\r')
+  })
+
+  it('uses insertAtPrompt only when submit:false (no Enter)', async () => {
     const t = makeCtx()
     await fire(t.ctx, bind({ text: 'git ', submit: false }))
 
     expect(t.insertAtPrompt).toHaveBeenCalledWith('git ')
+    expect(t.sendKey).not.toHaveBeenCalled()
     expect(t.write).not.toHaveBeenCalled()
   })
 
@@ -226,7 +362,8 @@ describe('fire', () => {
     const t = makeCtx()
     await fire(t.ctx, bind({ text: 'echo', submit: true }))
 
-    expect(t.write).toHaveBeenCalledWith('echo\n')
+    expect(t.insertAtPrompt).toHaveBeenCalledWith('echo')
+    expect(t.sendKey).toHaveBeenCalledWith('enter')
   })
 
   it('toasts a warning when no terminal is available and no input is focused', async () => {
@@ -243,7 +380,7 @@ describe('fire', () => {
 
   it('toasts an error when terminal write rejects', async () => {
     const t = makeCtx()
-    t.write.mockRejectedValueOnce(new Error('pty closed'))
+    t.insertAtPrompt.mockRejectedValueOnce(new Error('pty closed'))
     await fire(t.ctx, bind({ text: 'x', submit: true }))
 
     expect(t.error).toHaveBeenCalled()

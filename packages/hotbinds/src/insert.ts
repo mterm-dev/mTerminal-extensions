@@ -1,4 +1,4 @@
-import type { Binding, ExtCtx } from './types'
+import type { Binding, ExtCtx, TerminalHandleLite } from './types'
 
 export function randomId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -62,6 +62,42 @@ export function isInsideXterm(el: Element | null): boolean {
   return !!el.closest('.xterm, .xterm-screen, .xterm-helper-textarea, .xterm-viewport')
 }
 
+/**
+ * Pick which terminal should receive the snippet.
+ *
+ * `ctx.terminal.active()` is unreliable on this host: it can return null when
+ * a plain shell tab is focused, and can return a stale handle (e.g. a
+ * sidebar/secondary terminal) instead of the visible tab. We prefer the
+ * currently-focused tab if it is a terminal, and fall back through several
+ * heuristics so the snippet still lands somewhere sensible.
+ */
+export function resolveTargetTerminal(ctx: ExtCtx): TerminalHandleLite | null {
+  // 1. Whatever tab the user is actually looking at, if it is a terminal.
+  try {
+    const activeTab = ctx.tabs?.active?.()
+    if (activeTab) {
+      const t = ctx.terminal.byId(activeTab.id)
+      if (t) return t
+    }
+  } catch {
+    /* host may not implement tabs API */
+  }
+
+  // 2. Host's idea of the active terminal.
+  const active = ctx.terminal.active()
+  if (active) return active
+
+  // 3. If exactly one terminal exists, use it.
+  try {
+    const list = ctx.terminal.list()
+    if (Array.isArray(list) && list.length === 1) return list[0] ?? null
+  } catch {
+    /* list() not available */
+  }
+
+  return null
+}
+
 export async function fire(ctx: ExtCtx, binding: Binding): Promise<void> {
   const el = document.activeElement as HTMLElement | null
   const insideTerminal = isInsideXterm(el)
@@ -86,15 +122,34 @@ export async function fire(ctx: ExtCtx, binding: Binding): Promise<void> {
     }
   }
 
-  const term = ctx.terminal.active()
+  const term = resolveTargetTerminal(ctx)
+  ctx.logger.info('hotbinds.target', {
+    pickedTabId: term?.tabId ?? null,
+    activeTabId: ctx.tabs?.active?.()?.id ?? null,
+    legacyActiveTabId: ctx.terminal.active()?.tabId ?? null,
+    listCount: (() => {
+      try {
+        return ctx.terminal.list().length
+      } catch {
+        return -1
+      }
+    })(),
+  })
   if (!term) {
     ctx.ui.toast({ kind: 'warn', message: 'Hotbinds: no active terminal or input focused' })
     return
   }
 
   try {
-    if (binding.submit) await term.write(binding.text + '\n')
-    else await term.insertAtPrompt(binding.text)
+    await term.insertAtPrompt(binding.text)
+    if (binding.submit) {
+      // Submit by sending the Enter key. `write('\n')` is unreliable here:
+      // some hosts/PTYs don't translate LF to a line submit (real Enter
+      // sends CR, then the line discipline maps it). sendKey('enter') is
+      // unambiguous; fall back to a CR write if the host doesn't expose it.
+      if (typeof term.sendKey === 'function') await term.sendKey('enter')
+      else await term.write('\r')
+    }
   } catch (err) {
     ctx.logger.error('hotbinds: failed to write to terminal', err)
     ctx.ui.toast({ kind: 'error', message: 'Hotbinds: failed to write to terminal' })
