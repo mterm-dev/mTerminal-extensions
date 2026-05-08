@@ -57,7 +57,7 @@ function insertIntoContentEditable(el: HTMLElement, text: string): void {
  * not the textarea's value. Detect any descendant of an xterm container and
  * always route to the terminal API in that case.
  */
-function isInsideXterm(el: Element | null): boolean {
+export function isInsideXterm(el: Element | null): boolean {
   if (!el) return false
   return !!el.closest('.xterm, .xterm-screen, .xterm-helper-textarea, .xterm-viewport')
 }

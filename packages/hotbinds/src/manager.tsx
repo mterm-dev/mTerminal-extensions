@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { randomId } from './insert'
+import { formatNativeKeyEvent } from './keys'
 import type { Binding, ExtCtx } from './types'
 
 const STYLE_ID = 'hotbinds-ext-styles'
@@ -491,21 +492,6 @@ const QUICK_TEMPLATES: Array<Pick<Binding, 'name' | 'text' | 'submit'>> = [
   { name: 'docker ps', text: 'docker ps', submit: true },
   { name: 'k get pods', text: 'kubectl get pods', submit: true },
 ]
-
-function formatNativeKeyEvent(e: KeyboardEvent): string | null {
-  const k = e.key
-  if (k === 'Control' || k === 'Shift' || k === 'Alt' || k === 'Meta') return null
-  const parts: string[] = []
-  if (e.ctrlKey) parts.push('Ctrl')
-  if (e.altKey) parts.push('Alt')
-  if (e.shiftKey) parts.push('Shift')
-  if (e.metaKey) parts.push('Meta')
-  let key = k
-  if (key === ' ') key = 'Space'
-  else if (key.length === 1) key = key.toUpperCase()
-  parts.push(key)
-  return parts.join('+')
-}
 
 function KeyCapture({
   value,
