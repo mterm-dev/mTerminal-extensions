@@ -18,6 +18,7 @@ export interface UseGitStatusResult {
 export function useGitStatus(
   cwd: string | undefined,
   enabled: boolean,
+  paused?: boolean,
 ): UseGitStatusResult {
   const [status, setStatus] = useState<GitStatus | null>(null);
   const [loading, setLoading] = useState(false);
@@ -28,7 +29,9 @@ export function useGitStatus(
   const api = getGitApi();
   const apiRef = useRef(api);
   apiRef.current = api;
-  const pausedRef = useRef(false);
+  const mutationPausedRef = useRef(false);
+  const externalPausedRef = useRef(!!paused);
+  externalPausedRef.current = !!paused;
   const upstreamRef = useRef<string | null>(null);
   upstreamRef.current = status?.upstream ?? null;
 
@@ -63,11 +66,13 @@ export function useGitStatus(
       return;
     }
     void fetchOnce();
+    const isPaused = () =>
+      mutationPausedRef.current || externalPausedRef.current;
     const handle = setInterval(() => {
-      if (!pausedRef.current) void fetchOnce();
+      if (!isPaused()) void fetchOnce();
     }, POLL_MS);
     const fetchHandle = setInterval(async () => {
-      if (pausedRef.current) return;
+      if (isPaused()) return;
       if (!upstreamRef.current) return;
       const a = apiRef.current;
       const c = cwdRef.current;
@@ -77,7 +82,7 @@ export function useGitStatus(
       } catch {
         return;
       }
-      if (!pausedRef.current) void fetchOnce();
+      if (!isPaused()) void fetchOnce();
     }, AUTO_FETCH_MS);
     return () => {
       clearInterval(handle);
@@ -93,13 +98,13 @@ export function useGitStatus(
     async <T,>(fn: (a: MtGit) => Promise<T>): Promise<T> => {
       const a = apiRef.current;
       if (!a) throw new Error("git api unavailable");
-      pausedRef.current = true;
+      mutationPausedRef.current = true;
       try {
         const result = await fn(a);
         await fetchOnce();
         return result;
       } finally {
-        pausedRef.current = false;
+        mutationPausedRef.current = false;
       }
     },
     [fetchOnce],

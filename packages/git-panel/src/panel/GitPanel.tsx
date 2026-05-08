@@ -99,11 +99,15 @@ export function GitPanel({
   onUpdatePullStrategy,
 }: Props) {
   const enabled = !!cwd;
-  const { status, error, refresh, runMutation, api } = useGitStatus(cwd, enabled);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState("");
   const [diffOpen, setDiffOpen] = useState<DiffTarget | null>(null);
+  const { status, error, refresh, runMutation, api } = useGitStatus(
+    cwd,
+    enabled,
+    !!diffOpen,
+  );
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionInfo, setActionInfo] = useState<string | null>(null);
