@@ -492,7 +492,7 @@ const QUICK_TEMPLATES: Array<Pick<Binding, 'name' | 'text' | 'submit'>> = [
   { name: 'k get pods', text: 'kubectl get pods', submit: true },
 ]
 
-function formatKeyEvent(e: React.KeyboardEvent): string | null {
+function formatNativeKeyEvent(e: KeyboardEvent): string | null {
   const k = e.key
   if (k === 'Control' || k === 'Shift' || k === 'Alt' || k === 'Meta') return null
   const parts: string[] = []
@@ -518,6 +518,33 @@ function KeyCapture({
   const ref = useRef<HTMLDivElement>(null)
   const parts = value ? value.split('+') : []
 
+  // While recording, intercept keystrokes on the *capture* phase so the host's
+  // global keybinding dispatcher (which also listens in capture phase and may
+  // call stopPropagation) never sees them. Otherwise Ctrl+<key> combos that
+  // collide with any registered binding fire that binding instead of being
+  // recorded here.
+  useEffect(() => {
+    if (!recording) return
+    const onKey = (e: KeyboardEvent): void => {
+      // Allow the user to bail out cleanly.
+      if (e.key === 'Escape' || e.key === 'Tab') {
+        ref.current?.blur()
+        return
+      }
+      const combo = formatNativeKeyEvent(e)
+      if (!combo) return
+      // Block both the host dispatcher (capture phase) and the browser default
+      // (e.g. Ctrl+R reload, Ctrl+W close).
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      e.stopPropagation()
+      onChange(combo)
+      ref.current?.blur()
+    }
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
+  }, [recording, onChange])
+
   return (
     <div
       ref={ref}
@@ -529,15 +556,6 @@ function KeyCapture({
       tabIndex={0}
       onFocus={() => setRecording(true)}
       onBlur={() => setRecording(false)}
-      onKeyDown={(e) => {
-        if (!recording) return
-        const combo = formatKeyEvent(e)
-        if (!combo) return
-        e.preventDefault()
-        e.stopPropagation()
-        onChange(combo)
-        ref.current?.blur()
-      }}
     >
       {recording ? (
         <span className="hb-kbd-placeholder">press a combo…</span>
