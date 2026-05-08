@@ -14,6 +14,14 @@ const CSS = `
   font-size: var(--t-sm);
   color: var(--fg);
   background: var(--bg-base);
+  container-type: inline-size;
+  container-name: hb-modal;
+}
+@container hb-modal (max-width: 520px) {
+  .hb-subtitle { display: none; }
+  .hb-head { padding: 10px 12px; }
+  .hb-body { padding: 10px 12px 12px; }
+  .hb-foot { padding: 10px 12px; }
 }
 .hb-head {
   display: flex;
@@ -22,6 +30,7 @@ const CSS = `
   padding: 14px 18px 12px;
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 .hb-head-title {
   display: flex;
@@ -61,6 +70,8 @@ const CSS = `
   display: flex;
   flex-direction: column;
   gap: 10px;
+  container-type: inline-size;
+  container-name: hb-body;
 }
 .hb-body::-webkit-scrollbar { width: 10px; }
 .hb-body::-webkit-scrollbar-track { background: transparent; }
@@ -159,6 +170,7 @@ const CSS = `
 .hb-card {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(140px, auto) minmax(220px, 2fr) auto auto;
+  grid-template-areas: "name shortcut snippet submit actions";
   gap: 10px;
   align-items: stretch;
   padding: 10px;
@@ -167,6 +179,51 @@ const CSS = `
   border-radius: var(--r-md, 8px);
   transition: border-color 0.12s, box-shadow 0.12s;
   position: relative;
+  min-width: 0;
+}
+.hb-card > .hb-cell:nth-of-type(1) { grid-area: name; }
+.hb-card > .hb-cell:nth-of-type(2) { grid-area: shortcut; }
+.hb-card > .hb-cell:nth-of-type(3) { grid-area: snippet; }
+.hb-card > .hb-segmented { grid-area: submit; }
+.hb-card > .hb-actions { grid-area: actions; }
+
+/* Narrow viewport (e.g. embedded in Settings card): stack everything. */
+@container hb-body (max-width: 720px) {
+  .hb-card {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "name name"
+      "shortcut shortcut"
+      "snippet snippet"
+      "submit actions";
+    gap: 8px;
+  }
+  .hb-card > .hb-segmented {
+    margin-top: 4px;
+    justify-self: start;
+  }
+  .hb-card > .hb-actions {
+    margin-top: 4px;
+    flex-direction: row;
+    align-self: end;
+    justify-self: end;
+  }
+}
+
+/* Even narrower: actions go on their own row to avoid clipping. */
+@container hb-body (max-width: 480px) {
+  .hb-card {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "name"
+      "shortcut"
+      "snippet"
+      "submit"
+      "actions";
+  }
+  .hb-card > .hb-actions {
+    justify-self: start;
+  }
 }
 .hb-card:hover {
   border-color: var(--border);
