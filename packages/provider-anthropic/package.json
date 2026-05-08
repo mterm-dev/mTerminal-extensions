@@ -31,7 +31,7 @@
     "displayName": "Anthropic",
     "icon": "icons/anthropic.svg",
     "activationEvents": ["onStartupFinished"],
-    "capabilities": ["network"],
+    "capabilities": ["network:limited"],
     "providedServices": {
       "ai.sdk.anthropic": { "version": "1.0.0" }
     },

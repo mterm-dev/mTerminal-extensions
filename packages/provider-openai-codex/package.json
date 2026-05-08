@@ -31,7 +31,7 @@
     "displayName": "OpenAI Codex",
     "icon": "icons/openai.svg",
     "activationEvents": ["onStartupFinished"],
-    "capabilities": ["network"],
+    "capabilities": ["network:limited"],
     "providedServices": {
       "ai.sdk.openai-codex": { "version": "1.0.0" }
     },

@@ -31,7 +31,7 @@
     "displayName": "Ollama",
     "icon": "icons/ollama.svg",
     "activationEvents": ["onStartupFinished"],
-    "capabilities": ["network"],
+    "capabilities": ["network:limited"],
     "providedServices": {
       "ai.sdk.ollama": { "version": "1.0.0" }
     },
