@@ -39,7 +39,7 @@ import { PullDialog } from "../components/PullDialog";
 import { PushDialog } from "../components/PushDialog";
 import { ConflictResolverModal } from "../components/ConflictResolverModal";
 import { FileContextMenu, type FileMenuState } from "../components/FileContextMenu";
-import { isConflictFile } from "../lib/git-api";
+import { isConflictFile, toPathspec } from "../lib/git-api";
 
 const FEW_SHOT_DIFF = `Generate a commit message for the following staged changes:
 
@@ -167,8 +167,9 @@ export function GitPanel({
     const isChecked = checked.has(f.path);
     setPathsChecked([f.path], !isChecked);
     try {
+      const ps = [toPathspec(f.path)];
       await runMutation((api) =>
-        isChecked ? api.unstage(cwd!, [f.path]) : api.stage(cwd!, [f.path]),
+        isChecked ? api.unstage(cwd!, ps) : api.stage(cwd!, ps),
       );
     } catch (e) {
       setActionError((e as Error).message);
@@ -191,7 +192,7 @@ export function GitPanel({
             "host does not implement mt.git.discardPaths — update mTerminal to enable per-file rollback",
           );
         }
-        await api.discardPaths(cwd, [f.path]);
+        await api.discardPaths(cwd, [toPathspec(f.path)]);
       });
       setPathsChecked([f.path], false);
       setActionInfo(`rolled back ${f.path}`);
@@ -213,8 +214,9 @@ export function GitPanel({
     const shouldCheck = state !== "checked";
     setPathsChecked(paths, shouldCheck);
     try {
+      const ps = paths.map(toPathspec);
       await runMutation((api) =>
-        shouldCheck ? api.stage(cwd!, paths) : api.unstage(cwd!, paths),
+        shouldCheck ? api.stage(cwd!, ps) : api.unstage(cwd!, ps),
       );
     } catch (e) {
       setActionError((e as Error).message);
@@ -237,10 +239,9 @@ export function GitPanel({
     const shouldCheck = selectAllState !== "checked";
     setPathsChecked(allFilePaths, shouldCheck);
     try {
+      const ps = allFilePaths.map(toPathspec);
       await runMutation((api) =>
-        shouldCheck
-          ? api.stage(cwd!, allFilePaths)
-          : api.unstage(cwd!, allFilePaths),
+        shouldCheck ? api.stage(cwd!, ps) : api.unstage(cwd!, ps),
       );
     } catch (e) {
       setActionError((e as Error).message);
@@ -285,9 +286,9 @@ export function GitPanel({
       await runMutation(async (api) => {
         const toStage = files
           .filter((f) => checked.has(f.path) && !f.staged)
-          .map((f) => f.path);
+          .map((f) => toPathspec(f.path));
         if (toStage.length > 0) await api.stage(cwd, toStage);
-        await api.commit(cwd, message, checkedPaths);
+        await api.commit(cwd, message, checkedPaths.map(toPathspec));
       });
       setMessage("");
       setActionInfo("commit created");
@@ -378,7 +379,7 @@ export function GitPanel({
       const f = files.find((x) => x.path === p);
       const useStaged = f ? f.staged && !f.unstaged : true;
       try {
-        const { text } = await api.diff(cwd, p, useStaged);
+        const { text } = await api.diff(cwd, toPathspec(p), useStaged);
         const chunk = `--- ${p} ---\n${text}\n`;
         if (payload.length + chunk.length > MAX) {
           truncated = true;

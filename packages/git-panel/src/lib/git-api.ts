@@ -200,3 +200,7 @@ export function getGitApi(): MtGit | null {
   const mt = (window as unknown as { mt?: { git?: MtGit } }).mt;
   return mt?.git ?? null;
 }
+
+export function toPathspec(p: string): string {
+  return p.startsWith(":/") ? p : `:/${p}`;
+}
