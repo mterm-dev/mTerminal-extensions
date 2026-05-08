@@ -1,0 +1,67 @@
+{
+  "name": "@mterminal/ext-provider-anthropic",
+  "version": "1.0.0",
+  "description": "Anthropic Claude AI provider for mTerminal — bundles @anthropic-ai/sdk",
+  "license": "MIT",
+  "type": "module",
+  "renderer": "dist/renderer.mjs",
+  "engines": {
+    "mterminal-api": "^1.4.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@mterminal/extension-api": "^1.4.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0"
+  },
+  "devDependencies": {
+    "@mterminal/extension-api": "workspace:^",
+    "tsup": "^8.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.5"
+  },
+  "mterminal": {
+    "id": "provider-anthropic",
+    "displayName": "Anthropic",
+    "icon": "icons/anthropic.svg",
+    "activationEvents": ["onStartupFinished"],
+    "capabilities": ["network"],
+    "providedServices": {
+      "ai.sdk.anthropic": { "version": "1.0.0" }
+    },
+    "contributes": {
+      "providers": [
+        { "kind": "ai", "id": "anthropic", "label": "Anthropic" }
+      ],
+      "vaultKeys": [
+        {
+          "key": "ai_keys.anthropic",
+          "label": "Anthropic API key",
+          "link": "https://console.anthropic.com/settings/keys",
+          "placeholder": "sk-ant-…"
+        }
+      ],
+      "settings": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "default": "claude-opus-4-7",
+            "description": "Default model id passed to the SDK when no model is set in the host."
+          },
+          "baseUrl": {
+            "type": "string",
+            "default": "",
+            "description": "Optional base URL override (proxy / private endpoint)."
+          }
+        }
+      }
+    }
+  }
+}

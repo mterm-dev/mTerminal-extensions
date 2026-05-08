@@ -1,6 +1,6 @@
 {
   "name": "@mterminal/extension-api",
-  "version": "1.0.0-alpha.2",
+  "version": "1.4.0-alpha.0",
   "description": "TypeScript declarations for the mTerminal extension API",
   "license": "MIT",
   "homepage": "https://github.com/arthurr0/mTerminal",
@@ -20,6 +20,9 @@
     },
     "./events": {
       "types": "./src/events.d.ts"
+    },
+    "./sdk-services": {
+      "types": "./src/sdk-services.d.ts"
     }
   },
   "files": [

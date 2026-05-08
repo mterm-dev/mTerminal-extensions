@@ -1,0 +1,67 @@
+{
+  "name": "@mterminal/ext-provider-openai-codex",
+  "version": "1.0.0",
+  "description": "OpenAI Codex AI provider for mTerminal — bundles @openai/codex-sdk",
+  "license": "MIT",
+  "type": "module",
+  "renderer": "dist/renderer.mjs",
+  "engines": {
+    "mterminal-api": "^1.4.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@mterminal/extension-api": "^1.4.0"
+  },
+  "dependencies": {
+    "@openai/codex-sdk": "^0.1.0"
+  },
+  "devDependencies": {
+    "@mterminal/extension-api": "workspace:^",
+    "tsup": "^8.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.5"
+  },
+  "mterminal": {
+    "id": "provider-openai-codex",
+    "displayName": "OpenAI Codex",
+    "icon": "icons/openai.svg",
+    "activationEvents": ["onStartupFinished"],
+    "capabilities": ["network"],
+    "providedServices": {
+      "ai.sdk.openai-codex": { "version": "1.0.0" }
+    },
+    "contributes": {
+      "providers": [
+        { "kind": "ai", "id": "openai-codex", "label": "OpenAI Codex" }
+      ],
+      "vaultKeys": [
+        {
+          "key": "ai_keys.openai-codex",
+          "label": "OpenAI API key (Codex)",
+          "link": "https://platform.openai.com/api-keys",
+          "placeholder": "sk-…"
+        }
+      ],
+      "settings": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "default": "gpt-5-codex",
+            "description": "Default Codex model id."
+          },
+          "baseUrl": {
+            "type": "string",
+            "default": "",
+            "description": "Optional base URL override."
+          }
+        }
+      }
+    }
+  }
+}
