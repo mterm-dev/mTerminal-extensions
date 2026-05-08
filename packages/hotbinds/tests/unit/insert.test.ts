@@ -316,45 +316,25 @@ describe('fire', () => {
     expect(helper.value).toBe('')
   })
 
-  it('inserts the text and presses Enter via sendKey when submit:true', async () => {
+  it('writes the whole line with trailing LF when submit:true', async () => {
     const t = makeCtx()
     await fire(t.ctx, bind({ text: 'pwd', submit: true }))
 
-    expect(t.insertAtPrompt).toHaveBeenCalledWith('pwd')
-    expect(t.sendKey).toHaveBeenCalledWith('enter')
-    expect(t.write).not.toHaveBeenCalled()
+    // The host treats LF in write() as a line submit (same path file-browser
+    // uses for `cd <path>\n`). Single call — no separate Enter keystroke.
+    expect(t.write).toHaveBeenCalledWith('pwd\n')
+    expect(t.write).toHaveBeenCalledOnce()
+    expect(t.insertAtPrompt).not.toHaveBeenCalled()
+    expect(t.sendKey).not.toHaveBeenCalled()
   })
 
-  it('insertAtPrompt is called in order before sendKey on submit', async () => {
-    const t = makeCtx()
-    await fire(t.ctx, bind({ text: 'pwd', submit: true }))
-
-    const insertOrder = t.insertAtPrompt.mock.invocationCallOrder[0]
-    const enterOrder = t.sendKey.mock.invocationCallOrder[0]
-    expect(insertOrder).toBeLessThan(enterOrder)
-  })
-
-  it('falls back to write("\\r") when sendKey is not exposed by the host', async () => {
-    const term: TerminalHandleLite = {
-      tabId: 7,
-      write: vi.fn().mockResolvedValue(undefined),
-      insertAtPrompt: vi.fn().mockResolvedValue(undefined),
-      // no sendKey
-    }
-    const t = makeCtx({ terminal: term })
-    await fire(t.ctx, bind({ text: 'pwd', submit: true }))
-
-    expect(term.insertAtPrompt).toHaveBeenCalledWith('pwd')
-    expect(term.write).toHaveBeenCalledWith('\r')
-  })
-
-  it('uses insertAtPrompt only when submit:false (no Enter)', async () => {
+  it('uses insertAtPrompt without trailing newline when submit:false', async () => {
     const t = makeCtx()
     await fire(t.ctx, bind({ text: 'git ', submit: false }))
 
     expect(t.insertAtPrompt).toHaveBeenCalledWith('git ')
-    expect(t.sendKey).not.toHaveBeenCalled()
     expect(t.write).not.toHaveBeenCalled()
+    expect(t.sendKey).not.toHaveBeenCalled()
   })
 
   it('falls back to terminal when nothing focusable is active', async () => {
@@ -362,8 +342,7 @@ describe('fire', () => {
     const t = makeCtx()
     await fire(t.ctx, bind({ text: 'echo', submit: true }))
 
-    expect(t.insertAtPrompt).toHaveBeenCalledWith('echo')
-    expect(t.sendKey).toHaveBeenCalledWith('enter')
+    expect(t.write).toHaveBeenCalledWith('echo\n')
   })
 
   it('toasts a warning when no terminal is available and no input is focused', async () => {
@@ -380,7 +359,7 @@ describe('fire', () => {
 
   it('toasts an error when terminal write rejects', async () => {
     const t = makeCtx()
-    t.insertAtPrompt.mockRejectedValueOnce(new Error('pty closed'))
+    t.write.mockRejectedValueOnce(new Error('pty closed'))
     await fire(t.ctx, bind({ text: 'x', submit: true }))
 
     expect(t.error).toHaveBeenCalled()
