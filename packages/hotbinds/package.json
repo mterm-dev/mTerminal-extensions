@@ -56,7 +56,7 @@
         "properties": {
           "bindings": {
             "type": "array",
-            "description": "List of hotkey snippets. Edit via the manager (Ctrl+Alt+H) for the best UX.",
+            "description": "Stored hotkey snippets. Use the manager — open it via Ctrl+Alt+H, the ⌨ Hotbinds entry in the status bar, or the command palette → \"Hotbinds: Manage bindings\". This raw view is read-only and intended for backup/inspection only.",
             "items": {
               "type": "object",
               "properties": {
