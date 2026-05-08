@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { randomId } from './insert'
 import type { Binding, ExtCtx } from './types'
@@ -13,145 +13,427 @@ const CSS = `
   font-family: var(--font-sans);
   font-size: var(--t-sm);
   color: var(--fg);
+  background: var(--bg-base);
 }
-.hb-toolbar {
+.hb-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
+  gap: 12px;
+  padding: 14px 18px 12px;
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
-.hb-toolbar-title {
+.hb-head-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.hb-title {
   font-weight: 600;
+  font-size: var(--t-md);
   letter-spacing: -0.01em;
 }
-.hb-toolbar-spacer { flex: 1; }
+.hb-subtitle {
+  font-size: var(--t-xs);
+  color: var(--fg-dim);
+  letter-spacing: 0.02em;
+}
+.hb-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: var(--bg-active);
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+.hb-spacer { flex: 1; }
 .hb-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 8px 14px 14px;
+  padding: 14px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
+.hb-body::-webkit-scrollbar { width: 10px; }
+.hb-body::-webkit-scrollbar-track { background: transparent; }
+.hb-body::-webkit-scrollbar-thumb {
+  background: var(--n-300, var(--border));
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 5px;
+}
+
 .hb-empty {
-  padding: 24px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  padding: 32px 16px;
+  gap: 16px;
+}
+.hb-empty-art {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 6px;
+  opacity: 0.55;
+  margin-bottom: 4px;
+}
+.hb-empty-art .hb-cap {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--fg-muted);
+  background: var(--bg-raised, var(--bg-base));
+  border: 1px solid var(--border);
+  border-bottom-width: 3px;
+  border-radius: 8px;
+}
+.hb-empty-title {
+  font-size: var(--t-md);
+  font-weight: 600;
+  color: var(--fg);
+}
+.hb-empty-sub {
   color: var(--fg-dim);
-  font-style: italic;
+  font-size: var(--t-sm);
+  max-width: 380px;
+  line-height: 1.5;
 }
-.hb-row {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr 2fr auto auto;
-  gap: 8px;
-  align-items: start;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border-subtle);
+.hb-empty-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
 }
-.hb-row:last-child { border-bottom: 0; }
-.hb-row-hdr {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr 2fr auto auto;
-  gap: 8px;
-  padding: 4px 0;
+.hb-templates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  max-width: 520px;
+}
+.hb-templates-label {
+  width: 100%;
   font-size: var(--t-xs);
   color: var(--fg-dim);
+  text-align: center;
+  margin-top: 4px;
   text-transform: lowercase;
   letter-spacing: 0.04em;
-  border-bottom: 1px solid var(--border-subtle);
-  position: sticky;
-  top: 0;
-  background: var(--bg-raised, var(--bg-base));
-  z-index: 1;
 }
-.hb-input, .hb-textarea, .hb-key {
+.hb-template {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--fg-muted);
+  background: var(--bg-raised, var(--bg-base));
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.hb-template:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 8%, var(--bg-base));
+}
+
+.hb-card {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(140px, auto) minmax(220px, 2fr) auto auto;
+  gap: 10px;
+  align-items: stretch;
+  padding: 10px;
+  background: var(--bg-raised, var(--bg-base));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md, 8px);
+  transition: border-color 0.12s, box-shadow 0.12s;
+  position: relative;
+}
+.hb-card:hover {
+  border-color: var(--border);
+}
+.hb-card.dup {
+  border-color: var(--c-amber, var(--err));
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--c-amber, var(--err)) 30%, transparent);
+}
+.hb-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.hb-cell-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-dim);
+  font-weight: 600;
+}
+.hb-input, .hb-textarea {
   width: 100%;
   background: var(--bg-base);
   color: var(--fg);
   border: 1px solid var(--border);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-sm, 4px);
   padding: 6px 8px;
   font-family: inherit;
   font-size: var(--t-sm);
   outline: none;
   box-sizing: border-box;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.hb-input:focus, .hb-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent) 24%, transparent);
+}
+.hb-input::placeholder, .hb-textarea::placeholder {
+  color: var(--fg-dim);
 }
 .hb-textarea {
   font-family: var(--font-mono);
   font-size: var(--t-xs);
-  min-height: 60px;
+  min-height: 56px;
   resize: vertical;
+  line-height: 1.5;
 }
-.hb-key {
-  font-family: var(--font-mono);
-  font-size: var(--t-xs);
-  cursor: text;
-}
-.hb-key.recording {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent) 30%, transparent);
-}
-.hb-input:focus, .hb-textarea:focus, .hb-key:focus {
-  border-color: var(--accent);
-}
-.hb-submit-cell {
+
+/* Key capture: visual kbd display */
+.hb-kbd-host {
+  position: relative;
+  width: 100%;
+  min-height: 32px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding-top: 8px;
-}
-.hb-del {
-  background: transparent;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--bg-base);
   border: 1px solid var(--border);
+  border-radius: var(--r-sm, 4px);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
+  flex-wrap: wrap;
+}
+.hb-kbd-host:hover { border-color: var(--fg-dim); }
+.hb-kbd-host:focus, .hb-kbd-host.recording {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent) 24%, transparent);
+}
+.hb-kbd-host.empty {
+  border-style: dashed;
+}
+.hb-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
   color: var(--fg-muted);
-  border-radius: var(--r-sm);
-  padding: 6px 8px;
+  background: linear-gradient(180deg, var(--bg-raised, var(--bg-base)), var(--bg-active, var(--bg-base)));
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.hb-kbd-plus {
+  color: var(--fg-dim);
+  font-weight: 400;
+  font-size: 10px;
+}
+.hb-kbd-placeholder {
+  color: var(--fg-dim);
+  font-size: var(--t-xs);
+  font-style: italic;
+  padding: 0 4px;
+}
+.hb-kbd-clear {
+  margin-left: auto;
+  background: transparent;
+  border: 0;
+  color: var(--fg-dim);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+.hb-kbd-clear:hover { color: var(--err); background: var(--bg-hover); }
+
+/* Submit toggle: segmented switch */
+.hb-segmented {
+  display: inline-flex;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm, 4px);
+  padding: 2px;
+  gap: 2px;
+  align-self: center;
+  margin-top: 16px;
+}
+.hb-seg {
+  background: transparent;
+  border: 0;
+  color: var(--fg-dim);
   cursor: pointer;
   font: inherit;
-  align-self: start;
+  font-size: var(--t-xs);
+  padding: 4px 8px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.12s;
+  white-space: nowrap;
 }
-.hb-del:hover {
+.hb-seg:hover { color: var(--fg-muted); }
+.hb-seg.active {
+  background: var(--bg-active);
+  color: var(--fg);
+}
+.hb-seg-icon {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+/* Card actions */
+.hb-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  justify-content: flex-start;
+  margin-top: 16px;
+}
+.hb-icon-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--fg-dim);
+  border-radius: var(--r-sm, 4px);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  transition: all 0.12s;
+}
+.hb-icon-btn:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+  border-color: var(--border-subtle);
+}
+.hb-icon-btn.danger:hover {
   color: var(--err);
   border-color: var(--err);
 }
+
+.hb-msg {
+  font-size: 11px;
+  color: var(--c-amber, var(--err));
+  padding-left: 2px;
+}
+
+/* Buttons */
 .hb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: transparent;
   border: 1px solid var(--border);
   color: var(--fg);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-sm, 4px);
   padding: 6px 12px;
   cursor: pointer;
   font: inherit;
+  font-size: var(--t-sm);
+  transition: all 0.12s;
 }
-.hb-btn:hover { background: var(--bg-hover); }
+.hb-btn:hover { background: var(--bg-hover); border-color: var(--fg-dim); }
 .hb-btn.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--bg-base);
   font-weight: 600;
 }
-.hb-btn.primary:hover { filter: brightness(1.1); }
-.hb-conflict {
-  margin-top: 4px;
-  font-size: var(--t-xs);
-  color: var(--c-amber, var(--err));
+.hb-btn.primary:hover { filter: brightness(1.08); }
+.hb-btn.subtle {
+  border-color: var(--border-subtle);
+  color: var(--fg-muted);
 }
-.hb-footer {
+.hb-btn-plus {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.hb-foot {
   display: flex;
+  align-items: center;
   gap: 8px;
-  justify-content: flex-end;
-  padding: 10px 14px;
+  padding: 12px 18px;
   border-top: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  background: var(--bg-base);
+}
+.hb-foot-hint {
+  font-size: var(--t-xs);
+  color: var(--fg-dim);
+  font-family: var(--font-mono);
+}
+.hb-foot-hint kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  margin: 0 1px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  font-size: 10px;
+  background: var(--bg-raised, var(--bg-base));
 }
 `
 
 function ensureStyles(): void {
-  if (document.getElementById(STYLE_ID)) return
+  const existing = document.getElementById(STYLE_ID)
+  if (existing) existing.remove()
   const el = document.createElement('style')
   el.id = STYLE_ID
   el.textContent = CSS
   document.head.appendChild(el)
 }
+
+const QUICK_TEMPLATES: Array<Pick<Binding, 'name' | 'text' | 'submit'>> = [
+  { name: 'git status', text: 'git status', submit: true },
+  { name: 'git pull', text: 'git pull', submit: true },
+  { name: 'ls -la', text: 'ls -la', submit: true },
+  { name: 'clear', text: 'clear', submit: true },
+  { name: 'docker ps', text: 'docker ps', submit: true },
+  { name: 'k get pods', text: 'kubectl get pods', submit: true },
+]
 
 function formatKeyEvent(e: React.KeyboardEvent): string | null {
   const k = e.key
@@ -176,12 +458,18 @@ function KeyCapture({
   onChange(next: string): void
 }): React.ReactElement {
   const [recording, setRecording] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const parts = value ? value.split('+') : []
+
   return (
-    <input
-      className={'hb-key' + (recording ? ' recording' : '')}
-      value={recording ? 'press a combo…' : value}
-      placeholder="Click and press a combo"
-      readOnly
+    <div
+      ref={ref}
+      className={
+        'hb-kbd-host' +
+        (recording ? ' recording' : '') +
+        (!value ? ' empty' : '')
+      }
+      tabIndex={0}
       onFocus={() => setRecording(true)}
       onBlur={() => setRecording(false)}
       onKeyDown={(e) => {
@@ -191,9 +479,66 @@ function KeyCapture({
         e.preventDefault()
         e.stopPropagation()
         onChange(combo)
-        ;(e.target as HTMLInputElement).blur()
+        ref.current?.blur()
       }}
-    />
+    >
+      {recording ? (
+        <span className="hb-kbd-placeholder">press a combo…</span>
+      ) : parts.length ? (
+        parts.map((p, i) => (
+          <React.Fragment key={i}>
+            {i > 0 ? <span className="hb-kbd-plus">+</span> : null}
+            <span className="hb-kbd">{p}</span>
+          </React.Fragment>
+        ))
+      ) : (
+        <span className="hb-kbd-placeholder">click to record</span>
+      )}
+      {value && !recording ? (
+        <button
+          className="hb-kbd-clear"
+          onMouseDown={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onChange('')
+          }}
+          title="Clear"
+        >
+          ✕
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+function SubmitToggle({
+  value,
+  onChange,
+}: {
+  value: boolean
+  onChange(next: boolean): void
+}): React.ReactElement {
+  return (
+    <div className="hb-segmented" role="group" title="What to do when target is the terminal">
+      <button
+        className={'hb-seg' + (!value ? ' active' : '')}
+        onClick={() => onChange(false)}
+        type="button"
+        title="Insert text without pressing Enter"
+      >
+        <span className="hb-seg-icon">▷</span>
+        Insert
+      </button>
+      <button
+        className={'hb-seg' + (value ? ' active' : '')}
+        onClick={() => onChange(true)}
+        type="button"
+        title="Insert text and press Enter"
+      >
+        <span className="hb-seg-icon">↵</span>
+        Run
+      </button>
+    </div>
   )
 }
 
@@ -223,11 +568,26 @@ function Manager({
     setItems((prev) => prev.map((b, i) => (i === idx ? { ...b, ...patch } : b)))
   }
 
-  const add = (): void => {
+  const add = (preset?: Pick<Binding, 'name' | 'text' | 'submit'>): void => {
     setItems((prev) => [
       ...prev,
-      { id: randomId(), name: '', key: '', text: '', submit: false },
+      {
+        id: randomId(),
+        name: preset?.name ?? '',
+        key: '',
+        text: preset?.text ?? '',
+        submit: preset?.submit ?? false,
+      },
     ])
+  }
+
+  const duplicate = (idx: number): void => {
+    setItems((prev) => {
+      const src = prev[idx]
+      if (!src) return prev
+      const copy: Binding = { ...src, id: randomId(), key: '', name: src.name ? `${src.name} (copy)` : '' }
+      return [...prev.slice(0, idx + 1), copy, ...prev.slice(idx + 1)]
+    })
   }
 
   const remove = (idx: number): void => {
@@ -239,78 +599,151 @@ function Manager({
       .map((b) => ({ ...b, name: b.name.trim(), key: b.key.trim(), text: b.text }))
       .filter((b) => b.key.length > 0)
     await ctx.settings.set('bindings', cleaned)
-    ctx.ui.toast({ kind: 'success', message: `Hotbinds: saved ${cleaned.length} binding(s)` })
+    ctx.ui.toast({
+      kind: 'success',
+      message: `Hotbinds: saved ${cleaned.length} binding${cleaned.length === 1 ? '' : 's'}`,
+    })
     ctrl.close()
   }
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        void save()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items])
+
+  const count = items.length
+  const valid = items.filter((b) => b.key.trim().length > 0).length
+
   return (
     <div className="hb-modal">
-      <div className="hb-toolbar">
-        <span className="hb-toolbar-title">Hotbinds</span>
-        <span className="hb-toolbar-spacer" />
-        <button className="hb-btn" onClick={add}>+ Add binding</button>
+      <div className="hb-head">
+        <div className="hb-head-title">
+          <span className="hb-title">Hotbinds</span>
+          <span className="hb-count" title={`${valid} of ${count} ready to save`}>
+            {count}
+          </span>
+        </div>
+        <span className="hb-subtitle">global shortcuts → text into focused input or terminal</span>
+        <span className="hb-spacer" />
+        <button className="hb-btn" onClick={() => add()} type="button">
+          <span className="hb-btn-plus">+</span> Add binding
+        </button>
       </div>
+
       <div className="hb-body">
         {items.length === 0 ? (
           <div className="hb-empty">
-            No bindings yet. Click <strong>+ Add binding</strong> to create one.
+            <div className="hb-empty-art" aria-hidden>
+              <span className="hb-cap">⌃</span>
+              <span className="hb-cap">⌥</span>
+              <span className="hb-cap">1</span>
+            </div>
+            <div className="hb-empty-title">No hotbinds yet</div>
+            <div className="hb-empty-sub">
+              Bind a keyboard shortcut to a snippet. When you press the combo, the text fires
+              into whatever you're focused on — terminal, commit message, anywhere.
+            </div>
+            <div className="hb-empty-actions">
+              <button className="hb-btn primary" onClick={() => add()} type="button">
+                <span className="hb-btn-plus">+</span> Create your first binding
+              </button>
+              <div className="hb-templates-label">or start from a template</div>
+              <div className="hb-templates">
+                {QUICK_TEMPLATES.map((t) => (
+                  <button
+                    key={t.name}
+                    className="hb-template"
+                    onClick={() => add(t)}
+                    type="button"
+                  >
+                    {t.text}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
-          <>
-            <div className="hb-row-hdr">
-              <span>Name</span>
-              <span>Shortcut</span>
-              <span>Snippet</span>
-              <span>Submit</span>
-              <span />
-            </div>
-            {items.map((b, idx) => (
-              <div className="hb-row" key={b.id}>
-                <div>
+          items.map((b, idx) => {
+            const dup = b.key && conflicts.has(b.key.trim())
+            return (
+              <div className={'hb-card' + (dup ? ' dup' : '')} key={b.id}>
+                <div className="hb-cell">
+                  <span className="hb-cell-label">Name</span>
                   <input
                     className="hb-input"
-                    placeholder="e.g. git status"
+                    placeholder="describe what it does"
                     value={b.name}
                     onChange={(e) => update(idx, { name: e.target.value })}
                   />
                 </div>
-                <div>
+                <div className="hb-cell">
+                  <span className="hb-cell-label">Shortcut</span>
                   <KeyCapture value={b.key} onChange={(k) => update(idx, { key: k })} />
-                  {b.key && conflicts.has(b.key.trim()) ? (
-                    <div className="hb-conflict">Duplicate shortcut</div>
-                  ) : null}
+                  {dup ? <div className="hb-msg">Duplicate shortcut</div> : null}
                 </div>
-                <div>
+                <div className="hb-cell">
+                  <span className="hb-cell-label">Snippet</span>
                   <textarea
                     className="hb-textarea"
-                    placeholder="Text to insert"
+                    placeholder="text to insert"
                     value={b.text}
                     onChange={(e) => update(idx, { text: e.target.value })}
+                    spellCheck={false}
                   />
                 </div>
-                <div className="hb-submit-cell">
-                  <input
-                    type="checkbox"
-                    title="Append Enter when firing into terminal"
-                    checked={b.submit}
-                    onChange={(e) => update(idx, { submit: e.target.checked })}
-                  />
+                <SubmitToggle value={b.submit} onChange={(v) => update(idx, { submit: v })} />
+                <div className="hb-actions">
+                  <button
+                    className="hb-icon-btn"
+                    title="Duplicate"
+                    onClick={() => duplicate(idx)}
+                    type="button"
+                  >
+                    ⎘
+                  </button>
+                  <button
+                    className="hb-icon-btn danger"
+                    title="Delete"
+                    onClick={() => remove(idx)}
+                    type="button"
+                  >
+                    ✕
+                  </button>
                 </div>
-                <button
-                  className="hb-del"
-                  onClick={() => remove(idx)}
-                  title="Remove"
-                >
-                  ✕
-                </button>
               </div>
-            ))}
-          </>
+            )
+          })
         )}
       </div>
-      <div className="hb-footer">
-        <button className="hb-btn" onClick={() => ctrl.close()}>Cancel</button>
-        <button className="hb-btn primary" onClick={() => void save()}>Save</button>
+
+      <div className="hb-foot">
+        <span className="hb-foot-hint">
+          <kbd>Ctrl</kbd>+<kbd>S</kbd> save · <kbd>Esc</kbd> close
+        </span>
+        <span className="hb-spacer" />
+        <button className="hb-btn subtle" onClick={() => ctrl.close()} type="button">
+          Cancel
+        </button>
+        <button
+          className="hb-btn primary"
+          onClick={() => void save()}
+          type="button"
+          disabled={items.some((b) => !b.key.trim())}
+          title={
+            items.some((b) => !b.key.trim())
+              ? 'Some bindings still need a shortcut'
+              : 'Save all bindings'
+          }
+        >
+          Save
+        </button>
       </div>
     </div>
   )
@@ -320,8 +753,8 @@ export async function openManager(ctx: ExtCtx): Promise<void> {
   ensureStyles()
   await ctx.ui.openModal({
     title: 'Hotbinds — Manage bindings',
-    width: 880,
-    height: 560,
+    width: 960,
+    height: 620,
     render: (host, ctrl) => {
       const root = createRoot(host)
       root.render(<Manager ctx={ctx} ctrl={ctrl} />)
