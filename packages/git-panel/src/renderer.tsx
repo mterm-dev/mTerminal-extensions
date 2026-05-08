@@ -157,18 +157,33 @@ function GitPanelMount({ ctx }: { ctx: ExtCtx }) {
         return "<unkeyable>";
       }
     };
-    const winMt = (typeof window !== "undefined" ? (window as unknown as { mt?: unknown }).mt : undefined);
+    const mt = ctx.mt as Record<string, unknown> | undefined;
+    const subMtKeys: Record<string, unknown> = {};
+    if (mt) {
+      for (const k of Object.keys(mt)) {
+        subMtKeys[k] = dumpKeys(mt[k]);
+      }
+    }
+    pushDebug("mount.api-shape", {
+      mtSubKeys: subMtKeys,
+    });
+    let selfEchoOk: string | boolean = "no-response";
+    try {
+      const off = ctx.events.on("git-panel:self-echo" as never, (p: unknown) => {
+        selfEchoOk = `received: ${JSON.stringify(p)}`;
+      });
+      ctx.events.emit("git-panel:self-echo" as never, { hello: "world" } as never);
+      window.setTimeout(() => {
+        off.dispose();
+        pushDebug("self-echo-result", { selfEchoOk });
+      }, 50);
+    } catch (err) {
+      pushDebug("self-echo-threw", { err: err instanceof Error ? err.message : String(err) });
+    }
     pushDebug("mount", {
       initialCwd: ctx.workspace.cwd(),
-      ctxKeys: Object.keys(ctx),
-      ctxMtKeys: dumpKeys(ctx.mt),
-      windowMtKeys: dumpKeys(winMt),
-      tabsKeys: dumpKeys(ctx.tabs),
-      workspaceKeys: dumpKeys(ctx.workspace),
-      eventsKeys: dumpKeys(ctx.events),
       terminalActive: safeCall(ctx.terminal?.active as undefined | (() => unknown)),
       tabsActive: safeCall(ctx.tabs.active as undefined | (() => unknown)),
-      tabsList: safeCall(ctx.tabs.list as undefined | (() => unknown)),
       activeGroup: safeCall(ctx.workspace.activeGroup as undefined | (() => unknown)),
     });
     const syncCwd = (source: string, payload?: unknown) => {
