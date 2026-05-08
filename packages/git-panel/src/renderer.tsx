@@ -113,9 +113,9 @@ function GitPanelMount({ ctx }: { ctx: ExtCtx }) {
   const [binding, setBinding] = useState<AiBindingConfig>(() => readBinding(ctx));
 
   useEffect(() => {
-    const offCwd = ctx.events.on("app:cwd:changed", () => {
-      setCwd(ctx.workspace.cwd() ?? undefined);
-    });
+    const syncCwd = () => setCwd(ctx.workspace.cwd() ?? undefined);
+    const offCwd = ctx.events.on("app:cwd:changed", syncCwd);
+    const offFocus = ctx.events.on("app:tab:focused", syncCwd);
     const offSettings = ctx.settings.onChange(() => {
       setSettings(readSettings(ctx));
       setBinding(readBinding(ctx));
@@ -126,6 +126,7 @@ function GitPanelMount({ ctx }: { ctx: ExtCtx }) {
     });
     return () => {
       offCwd.dispose();
+      offFocus.dispose();
       offSettings.dispose();
     };
   }, [ctx]);
