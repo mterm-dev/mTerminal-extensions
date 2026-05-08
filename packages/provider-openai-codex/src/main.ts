@@ -20,6 +20,9 @@ interface ConfigureArgs {
 interface RunArgs {
   prompt: string
   model?: string
+  /** Per-call API key override — bypasses the persistent vault-key client. */
+  apiKey?: string
+  baseUrl?: string
 }
 
 interface RunResult {
@@ -68,12 +71,16 @@ export async function activate(ctx: MainExtensionContext): Promise<void> {
   ctx.subscribe(
     ctx.ipc.handle('codex:run', async (raw) => {
       const args = (raw ?? {}) as RunArgs
-      if (!client) {
+      const adHoc = args.apiKey && args.apiKey.trim()
+        ? buildClient({ apiKey: args.apiKey, baseUrl: args.baseUrl ?? null })
+        : null
+      const useClient = adHoc ?? client
+      if (!useClient) {
         throw new Error(
           'OpenAI Codex SDK not configured — set the API key in Settings → AI → OpenAI Codex.',
         )
       }
-      const thread = client.startThread()
+      const thread = useClient.startThread()
       const result = (await thread.run({ input: args.prompt } as never)) as unknown as {
         finalResponse?: string
       }

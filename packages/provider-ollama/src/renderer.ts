@@ -20,6 +20,9 @@ interface CompleteReq {
   messages: Array<{ role: string; content: string }>
   system?: string
   signal?: AbortSignal
+  /** Per-call host-URL override. Ollama needs no API key, so apiKey is ignored. */
+  baseUrl?: string
+  apiKey?: string
 }
 
 const DEFAULT_HOST = 'http://localhost:11434'
@@ -64,6 +67,18 @@ export async function activate(ctx: ExtensionContext): Promise<void> {
       }),
     )
 
+    /**
+     * Resolve the SDK client for a given request. Honors `req.baseUrl` for
+     * per-call host overrides (custom-binding mode); otherwise reuses the
+     * persistent client built from extension settings.
+     */
+    const resolveClient = (req: CompleteReq): Ollama => {
+      if (req.baseUrl && req.baseUrl.trim()) {
+        return new Ollama({ host: req.baseUrl.trim() })
+      }
+      return client!
+    }
+
     const messagesFor = (req: CompleteReq) => {
       const out: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = []
       if (req.system) out.push({ role: 'system', content: req.system })
@@ -93,7 +108,7 @@ export async function activate(ctx: ExtensionContext): Promise<void> {
 
         async complete(reqRaw: unknown) {
           const req = reqRaw as CompleteReq
-          const c = client!
+          const c = resolveClient(req)
           const res = await c.chat({
             model: req.model || DEFAULT_MODEL,
             messages: messagesFor(req),
@@ -114,7 +129,7 @@ export async function activate(ctx: ExtensionContext): Promise<void> {
 
         async *stream(reqRaw: unknown) {
           const req = reqRaw as CompleteReq
-          const c = client!
+          const c = resolveClient(req)
           const stream = await c.chat({
             model: req.model || DEFAULT_MODEL,
             messages: messagesFor(req),

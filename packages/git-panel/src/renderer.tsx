@@ -14,20 +14,27 @@ import type { ExtensionContext } from "@mterminal/extension-api";
  * The panel stays props-shaped. The wrapper here adapts ctx → props so the
  * panel itself doesn't have to be rewritten field-by-field.
  *
- * After the SDK-as-extension refactor the AI side is unified through
- * `ctx.ai.stream()` — there is no per-extension API key storage anymore. The
- * binding only stores `{ provider, model, baseUrl }` (provider id is whatever
- * the user has installed) and the registered AI provider extension handles
- * keys via the host vault.
+ * After the SDK-as-extension refactor the AI side is fully unified through
+ * `ctx.ai.stream()` — installed AI provider extensions own their SDK clients
+ * and vault keys, and the host's `<AiBindingCard>` auto-renders provider +
+ * model picking inside Settings → Extensions → Git Panel.
+ *
+ * Two source modes:
+ *   • "core"   — use the provider extension's vault key from Settings → AI.
+ *   • "custom" — read a per-binding key from `ctx.secrets` and pass it as
+ *     `apiKey` to `ctx.ai.stream()`; the provider extension instantiates an
+ *     ad-hoc SDK client for the call only.
  */
 
 export interface AiBindingConfig {
+  source: "core" | "custom";
   provider: string;
   model: string;
   baseUrl?: string;
 }
 
 const DEFAULT_AI_BINDING: AiBindingConfig = {
+  source: "core",
   provider: "",
   model: "",
 };
@@ -44,9 +51,14 @@ function readSettings(ctx: ExtensionContext): GitPanelSettings {
 }
 
 function readBinding(ctx: ExtensionContext): AiBindingConfig {
-  const cfg = ctx.settings.get<Partial<AiBindingConfig> & { provider?: unknown; model?: unknown }>("ai.binding.commit");
+  const cfg = ctx.settings.get<Partial<AiBindingConfig> & {
+    source?: unknown;
+    provider?: unknown;
+    model?: unknown;
+  }>("ai.binding.commit");
   if (!cfg || typeof cfg !== "object") return DEFAULT_AI_BINDING;
   return {
+    source: cfg.source === "custom" ? "custom" : "core",
     provider: typeof cfg.provider === "string" ? cfg.provider : DEFAULT_AI_BINDING.provider,
     model: typeof cfg.model === "string" ? cfg.model : DEFAULT_AI_BINDING.model,
     baseUrl: typeof cfg.baseUrl === "string" ? cfg.baseUrl : undefined,
@@ -108,6 +120,7 @@ function GitPanelMount({ ctx }: { ctx: ExtensionContext }) {
       settings={settings}
       binding={binding}
       ai={ctx.ai}
+      secrets={ctx.secrets}
       height={height}
       onResizeHeight={(h) => {
         setHeight(h);

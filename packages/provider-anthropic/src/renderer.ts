@@ -28,6 +28,8 @@ interface CompleteReq {
   temperature?: number
   topP?: number
   signal?: AbortSignal
+  apiKey?: string
+  baseUrl?: string
 }
 
 const DEFAULT_MODEL = 'claude-opus-4-7'
@@ -93,6 +95,22 @@ export async function activate(ctx: ExtensionContext): Promise<void> {
       return client
     }
 
+    /**
+     * Resolve the SDK client for a given request. When the caller passes
+     * `req.apiKey` (custom-key binding), spawn an ad-hoc client with that
+     * override; otherwise use the persistent client built from the vault key.
+     */
+    const resolveClient = (req: CompleteReq): Anthropic => {
+      if (req.apiKey && req.apiKey.trim()) {
+        return new Anthropic({
+          apiKey: req.apiKey,
+          baseURL: req.baseUrl?.trim() || undefined,
+          dangerouslyAllowBrowser: true,
+        })
+      }
+      return requireClient()
+    }
+
     const mapMessages = (req: CompleteReq) =>
       req.messages
         .filter((m) => m.role !== 'system')
@@ -121,7 +139,7 @@ export async function activate(ctx: ExtensionContext): Promise<void> {
 
         async complete(reqRaw: unknown) {
           const req = reqRaw as CompleteReq
-          const c = requireClient()
+          const c = resolveClient(req)
           const res = await c.messages.create(
             {
               model: req.model || DEFAULT_MODEL,
@@ -152,7 +170,7 @@ export async function activate(ctx: ExtensionContext): Promise<void> {
 
         async *stream(reqRaw: unknown) {
           const req = reqRaw as CompleteReq
-          const c = requireClient()
+          const c = resolveClient(req)
           const stream = c.messages.stream(
             {
               model: req.model || DEFAULT_MODEL,

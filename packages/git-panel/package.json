@@ -1,12 +1,12 @@
 {
   "name": "@mterminal/ext-git-panel",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Full-featured Git panel for mTerminal",
   "license": "MIT",
   "type": "module",
   "renderer": "dist/renderer.mjs",
   "engines": {
-    "mterminal-api": "^1.4.0"
+    "mterminal-api": "^1.5.0"
   },
   "scripts": {
     "build": "tsup",
@@ -15,7 +15,7 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "@mterminal/extension-api": "^1.4.0",
+    "@mterminal/extension-api": "^1.5.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -148,7 +148,7 @@
         {
           "id": "commit",
           "label": "Commit message generator",
-          "description": "Picks the AI provider and model used by the Generate button. Install providers from Settings → AI; their API keys are managed centrally in the host vault."
+          "description": "Picks the AI provider and model used when you click the ✨ Generate button. Install providers from Settings → AI. By default keys come from the central vault; switch to ‘Custom key’ if you want a per-workflow override."
         }
       ]
     }

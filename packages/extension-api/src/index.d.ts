@@ -634,6 +634,20 @@ export interface AiStreamReq {
   system?: string
   messages: AiMessage[]
   signal?: AbortSignal
+  /**
+   * Per-call API key override. When set, the provider extension instantiates
+   * an ad-hoc SDK client for this call only, bypassing the centrally vault-
+   * stored key. Used by extension `aiBindings` in "custom key" mode where the
+   * binding owns its own per-workflow secret.
+   * @since mterminal-api 1.5.0
+   */
+  apiKey?: string
+  /**
+   * Per-call base-URL override. Same scope as `apiKey` — only applies to the
+   * single call.
+   * @since mterminal-api 1.5.0
+   */
+  baseUrl?: string
 }
 
 export interface AiProviderImpl {

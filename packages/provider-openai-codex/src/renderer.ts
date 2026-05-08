@@ -21,6 +21,8 @@ interface CompleteReq {
   messages: Array<{ role: string; content: string }>
   system?: string
   signal?: AbortSignal
+  apiKey?: string
+  baseUrl?: string
 }
 
 interface RunResult {
@@ -81,6 +83,8 @@ export async function activate(ctx: ExtensionContext): Promise<void> {
         const result = await ctx.ipc.invoke<RunResult>('codex:run', {
           prompt,
           model: req.model,
+          apiKey: req.apiKey,
+          baseUrl: req.baseUrl,
         })
         return {
           text: result.text,
@@ -97,6 +101,8 @@ export async function activate(ctx: ExtensionContext): Promise<void> {
         const result = await ctx.ipc.invoke<RunResult>('codex:run', {
           prompt,
           model: req.model,
+          apiKey: req.apiKey,
+          baseUrl: req.baseUrl,
         })
         if (req.signal?.aborted) return
         if (result.text) yield { text: result.text }

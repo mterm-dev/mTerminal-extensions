@@ -3,7 +3,7 @@ import { useGitStatus, type GitFile } from "../hooks/useGitStatus";
 import { GitDiffModal } from "../components/GitDiffModal";
 import type { GitPanelSettings as Settings } from "../types";
 import type { AiBindingConfig } from "../renderer";
-import type { AiApi } from "@mterminal/extension-api";
+import type { AiApi, SecretsApi } from "@mterminal/extension-api";
 import {
   buildTree,
   collectDirPaths,
@@ -69,6 +69,7 @@ interface Props {
   settings: Settings;
   binding: AiBindingConfig;
   ai: AiApi;
+  secrets: SecretsApi;
   height: number;
   onResizeHeight: (h: number) => void;
   msgHeight: number;
@@ -92,6 +93,7 @@ export function GitPanel({
   settings,
   binding,
   ai,
+  secrets,
   height,
   onResizeHeight,
   msgHeight,
@@ -354,7 +356,7 @@ export function GitPanel({
       return;
     }
 
-    const { provider, model } = binding;
+    const { source, provider, model, baseUrl } = binding;
     if (!provider.trim()) {
       setAiError("pick an AI provider in settings → extensions → git panel");
       return;
@@ -362,6 +364,22 @@ export function GitPanel({
     if (!model.trim()) {
       setAiError("pick a model in settings → extensions → git panel");
       return;
+    }
+
+    let customKey: string | null = null;
+    if (source === "custom") {
+      try {
+        customKey = await secrets.get(`ai.commit.${provider}.apiKey`);
+      } catch (e) {
+        setAiError((e as Error).message);
+        return;
+      }
+      if (!customKey || !customKey.trim()) {
+        setAiError(
+          `${provider} api key not set — open settings → extensions → git panel`,
+        );
+        return;
+      }
     }
 
     const MAX = 30_000;
@@ -409,6 +427,8 @@ export function GitPanel({
             },
           ],
           signal: controller.signal,
+          ...(customKey ? { apiKey: customKey } : {}),
+          ...(baseUrl ? { baseUrl } : {}),
         });
         for await (const delta of stream) {
           if (controller.signal.aborted) break;
