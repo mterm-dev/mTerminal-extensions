@@ -61,8 +61,20 @@ interface ExtCtx {
   };
   tabs: {
     onChange(cb: (tabs: unknown) => void): { dispose: () => void };
+    list?(): unknown;
+    active?(): unknown;
   };
-  workspace: { cwd(): string | null };
+  terminal?: {
+    active?(): unknown;
+    list?(): unknown;
+  };
+  workspace: {
+    cwd(): string | null;
+    activeGroup?(): string | null;
+    groups?(): unknown;
+    tabs?(groupId?: string): unknown;
+  };
+  mt?: Record<string, unknown>;
   secrets: SecretsApiLite;
   ui: {
     toast(opts: { kind?: "info" | "success" | "warn" | "error"; message: string }): void;
@@ -129,7 +141,36 @@ function GitPanelMount({ ctx }: { ctx: ExtCtx }) {
   const [binding, setBinding] = useState<AiBindingConfig>(() => readBinding(ctx));
 
   useEffect(() => {
-    pushDebug("mount", { initialCwd: ctx.workspace.cwd() });
+    const safeCall = <T,>(fn: (() => T) | undefined): T | string => {
+      if (typeof fn !== "function") return "<not a function>";
+      try {
+        return fn();
+      } catch (err) {
+        return `<threw: ${err instanceof Error ? err.message : String(err)}>`;
+      }
+    };
+    const dumpKeys = (obj: unknown): string[] | string => {
+      if (!obj || typeof obj !== "object") return `<${typeof obj}>`;
+      try {
+        return Object.keys(obj as Record<string, unknown>);
+      } catch {
+        return "<unkeyable>";
+      }
+    };
+    const winMt = (typeof window !== "undefined" ? (window as unknown as { mt?: unknown }).mt : undefined);
+    pushDebug("mount", {
+      initialCwd: ctx.workspace.cwd(),
+      ctxKeys: Object.keys(ctx),
+      ctxMtKeys: dumpKeys(ctx.mt),
+      windowMtKeys: dumpKeys(winMt),
+      tabsKeys: dumpKeys(ctx.tabs),
+      workspaceKeys: dumpKeys(ctx.workspace),
+      eventsKeys: dumpKeys(ctx.events),
+      terminalActive: safeCall(ctx.terminal?.active as undefined | (() => unknown)),
+      tabsActive: safeCall(ctx.tabs.active as undefined | (() => unknown)),
+      tabsList: safeCall(ctx.tabs.list as undefined | (() => unknown)),
+      activeGroup: safeCall(ctx.workspace.activeGroup as undefined | (() => unknown)),
+    });
     const syncCwd = (source: string, payload?: unknown) => {
       const next = ctx.workspace.cwd() ?? undefined;
       pushDebug(source, payload);
@@ -176,7 +217,22 @@ function GitPanelMount({ ctx }: { ctx: ExtCtx }) {
       open={debugOpen}
       onToggle={() => setDebugOpen((v) => !v)}
       onClear={() => setDebugLog([])}
-      onProbe={() => pushDebug("manual-probe", { workspaceCwd: ctx.workspace.cwd() })}
+      onProbe={() => {
+        const safeCall = <T,>(fn: (() => T) | undefined): T | string => {
+          if (typeof fn !== "function") return "<not a function>";
+          try {
+            return fn();
+          } catch (err) {
+            return `<threw: ${err instanceof Error ? err.message : String(err)}>`;
+          }
+        };
+        pushDebug("manual-probe", {
+          workspaceCwd: ctx.workspace.cwd(),
+          terminalActive: safeCall(ctx.terminal?.active as undefined | (() => unknown)),
+          tabsActive: safeCall(ctx.tabs.active as undefined | (() => unknown)),
+          activeGroup: safeCall(ctx.workspace.activeGroup as undefined | (() => unknown)),
+        });
+      }}
     />
     <GitPanel
       cwd={cwd}
