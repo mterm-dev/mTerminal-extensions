@@ -22,6 +22,10 @@ export function activate(ctx: ExtCtx): void {
   const applyBindings = (): void => {
     disposeDynamic()
     const raw = ctx.settings.get<Binding[]>('bindings')
+    ctx.logger.info('hotbinds.applyBindings', {
+      count: Array.isArray(raw) ? raw.length : 0,
+      keys: Array.isArray(raw) ? raw.map((b) => b?.key) : [],
+    })
     if (!Array.isArray(raw)) return
 
     for (const b of raw) {
@@ -40,6 +44,7 @@ export function activate(ctx: ExtCtx): void {
         dynamicDisposers.push(cmd)
         const kb = ctx.keybindings.register({ command: cmdId, key: b.key })
         dynamicDisposers.push(kb)
+        ctx.logger.info('hotbinds.registered', { cmdId, key: b.key })
       } catch (err) {
         ctx.logger.warn(`hotbinds: failed to register binding ${b.id}`, err)
       }

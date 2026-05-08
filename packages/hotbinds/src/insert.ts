@@ -65,6 +65,15 @@ function isInsideXterm(el: Element | null): boolean {
 export async function fire(ctx: ExtCtx, binding: Binding): Promise<void> {
   const el = document.activeElement as HTMLElement | null
   const insideTerminal = isInsideXterm(el)
+  ctx.logger.info('hotbinds.fire', {
+    id: binding.id,
+    key: binding.key,
+    submit: binding.submit,
+    textLen: binding.text.length,
+    activeTag: el?.tagName,
+    activeClass: el?.className,
+    insideTerminal,
+  })
 
   if (!insideTerminal) {
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
