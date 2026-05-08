@@ -59,6 +59,9 @@ interface ExtCtx {
     emit(event: string, payload?: unknown): void;
     on(event: string, cb: (payload: unknown) => void): { dispose: () => void };
   };
+  tabs: {
+    onChange(cb: (tabs: unknown) => void): { dispose: () => void };
+  };
   workspace: { cwd(): string | null };
   secrets: SecretsApiLite;
   ui: {
@@ -116,6 +119,7 @@ function GitPanelMount({ ctx }: { ctx: ExtCtx }) {
     const syncCwd = () => setCwd(ctx.workspace.cwd() ?? undefined);
     const offCwd = ctx.events.on("app:cwd:changed", syncCwd);
     const offFocus = ctx.events.on("app:tab:focused", syncCwd);
+    const offTabs = ctx.tabs.onChange(syncCwd);
     const offSettings = ctx.settings.onChange(() => {
       setSettings(readSettings(ctx));
       setBinding(readBinding(ctx));
@@ -127,6 +131,7 @@ function GitPanelMount({ ctx }: { ctx: ExtCtx }) {
     return () => {
       offCwd.dispose();
       offFocus.dispose();
+      offTabs.dispose();
       offSettings.dispose();
     };
   }, [ctx]);
