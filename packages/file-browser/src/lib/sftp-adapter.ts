@@ -2,6 +2,7 @@ type Invoker = <T = unknown>(channel: string, args?: unknown) => Promise<T>
 
 interface RawIpc {
   invoke: Invoker
+  on?(channel: string, cb: (payload: unknown) => void): { dispose(): void }
 }
 
 export interface SftpServiceLike {
@@ -54,6 +55,7 @@ export function createFsIpc(
   sftpProxy: ServiceProxyLike<SftpServiceLike> | null,
 ): RawIpc {
   return {
+    on: raw.on?.bind(raw),
     invoke<T = unknown>(channel: string, args?: unknown): Promise<T> {
       if (channel.startsWith('sftp:')) {
         const method = CHANNEL_TO_METHOD[channel]

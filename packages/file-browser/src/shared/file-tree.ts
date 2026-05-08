@@ -105,12 +105,13 @@ export function reduceTree(state: FileTreeState, action: TreeAction): FileTreeSt
     }
     case 'set-tree': {
       const nodes: Record<string, FileNode> = {}
+      const prev = state.nodes
       let rootChildPaths: string[] | null = null
       for (const [dirPath, dir] of Object.entries(action.dirs)) {
         const sorted = [...dir.entries].sort(sortEntries)
         const childPaths = sorted.map((e) => e.path)
         for (const e of sorted) {
-          const existing = nodes[e.path]
+          const existing = nodes[e.path] ?? prev[e.path]
           if (existing) {
             nodes[e.path] = {
               ...existing,
@@ -133,13 +134,14 @@ export function reduceTree(state: FileTreeState, action: TreeAction): FileTreeSt
         const childPaths = sorted.map((e) => e.path)
         const node = nodes[dirPath]
         if (!node) continue
+        const prevNode = prev[dirPath]
         nodes[dirPath] = {
           ...node,
           childPaths,
           loaded: true,
           loading: false,
           error: dir.error ?? null,
-          expanded: false,
+          expanded: prevNode ? prevNode.expanded : false,
         }
       }
       return {

@@ -13,6 +13,7 @@ import {
 
 interface IpcLite {
   invoke<T = unknown>(channel: string, args?: unknown): Promise<T>
+  on?(channel: string, cb: (payload: unknown) => void): { dispose(): void }
 }
 
 interface Args {
@@ -90,12 +91,24 @@ export function useFileBrowser(args: Args): UseFileBrowserResult {
   const callTreeSftp = useCallback(
     async (target: string, hostId: string): Promise<FileTreeResult> => {
       const dirs: Record<string, FileTreeDir> = {}
+      const visitedReal = new Set<string>()
       let nodeCount = 0
       let reachedCap = false
       const maxDepth = 8
       const maxNodes = 5000
       const walk = async (dirPath: string, depth: number): Promise<void> => {
         if (dirs[dirPath]) return
+        let real = dirPath
+        try {
+          real = await ipc.invoke<string>('sftp:realpath', { hostId, path: dirPath })
+        } catch {
+          // fall back to dirPath as cycle key
+        }
+        if (visitedReal.has(real)) {
+          dirs[dirPath] = { entries: [] }
+          return
+        }
+        visitedReal.add(real)
         let entries: FileEntry[] = []
         let error: string | undefined
         try {
@@ -176,7 +189,7 @@ export function useFileBrowser(args: Args): UseFileBrowserResult {
       const node = tree.nodes[p]
       if (!node) return
       dispatch({ type: 'expand', path: p } as TreeAction)
-      if (node.loaded) return
+      if (node.loaded || node.loading) return
       dispatch({ type: 'mark-loading', path: p, loading: true } as TreeAction)
       try {
         const res = await callList(p)
@@ -275,8 +288,10 @@ export function useFileBrowser(args: Args): UseFileBrowserResult {
         `${channelPrefix(backend)}:rename`,
         backendArgs(backend, { from, to }),
       )
-      const parent = parentOf(backend, from)
-      if (parent) await refreshDir(parent)
+      const fromParent = parentOf(backend, from)
+      const toParent = parentOf(backend, to)
+      if (fromParent) await refreshDir(fromParent)
+      if (toParent && toParent !== fromParent) await refreshDir(toParent)
     },
     [backend, ipc, refreshDir],
   )
@@ -331,7 +346,62 @@ export function useFileBrowser(args: Args): UseFileBrowserResult {
     [backend, ipc],
   )
 
-  void list
+  const refreshDirRef = useRef(refreshDir)
+  refreshDirRef.current = refreshDir
+  const treeRef = useRef(tree)
+  treeRef.current = tree
+
+  useEffect(() => {
+    if (!backend || backend.kind !== 'local') return
+    if (!ipc.on) return
+    const sub = ipc.on('fs:dir-changed', (payload) => {
+      const p = (payload as { path?: string } | null)?.path
+      if (!p) return
+      const t = treeRef.current
+      const node = t.nodes[p]
+      const isRoot = t.rootPath === p
+      if (!isRoot && (!node || !node.loaded)) return
+      if (!isRoot && node && !node.expanded) {
+        dispatch({ type: 'invalidate', path: p } as TreeAction)
+        return
+      }
+      void refreshDirRef.current(p)
+    })
+    return () => sub.dispose()
+  }, [backend, ipc])
+
+  const watchedRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!backend || backend.kind !== 'local') return
+    const desired = new Set<string>()
+    if (tree.rootPath) desired.add(tree.rootPath)
+    for (const [p, n] of Object.entries(tree.nodes)) {
+      if (n.kind === 'dir' && n.loaded) desired.add(p)
+    }
+    const current = watchedRef.current
+    for (const p of desired) {
+      if (!current.has(p)) {
+        void ipc.invoke('fs:watch-dir', { path: p }).catch(() => undefined)
+        current.add(p)
+      }
+    }
+    for (const p of current) {
+      if (!desired.has(p)) {
+        void ipc.invoke('fs:unwatch-dir', { path: p }).catch(() => undefined)
+        current.delete(p)
+      }
+    }
+  }, [backend, ipc, tree.nodes, tree.rootPath])
+
+  useEffect(() => {
+    return () => {
+      const current = watchedRef.current
+      for (const p of current) {
+        void ipc.invoke('fs:unwatch-dir', { path: p }).catch(() => undefined)
+      }
+      current.clear()
+    }
+  }, [ipc])
 
   return {
     tree,

@@ -1,6 +1,7 @@
 import React from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { TabBody } from './components/TabBody'
+import { mountSettings } from './settings'
 
 interface ExtCtx {
   id: string
@@ -42,6 +43,27 @@ interface ExtCtx {
   }
   ipc: {
     invoke<T = unknown>(channel: string, args?: unknown): Promise<T>
+  }
+  settings: {
+    get<T = unknown>(key: string): T | undefined
+    set(key: string, value: unknown): void | Promise<void>
+    onChange(cb: (key: string, value: unknown) => void): { dispose(): void }
+  }
+  settingsRenderer: {
+    register(spec: {
+      render(
+        host: HTMLElement,
+        ctx: {
+          host: HTMLElement
+          extId: string
+          settings: {
+            get<T = unknown>(key: string): T | undefined
+            set(key: string, value: unknown): void | Promise<void>
+            onChange(cb: (key: string, value: unknown) => void): { dispose(): void }
+          }
+        },
+      ): void | (() => void)
+    }): { dispose(): void }
   }
   services: Record<string, { available: boolean; impl: unknown }>
   ui: {
@@ -429,6 +451,12 @@ export function activate(ctx: ExtCtx): void {
     ctx.keybindings.register({
       command: 'fileBrowser.openInActiveGroup',
       key: 'Ctrl+B',
+    }),
+  )
+
+  ctx.subscribe(
+    ctx.settingsRenderer.register({
+      render: (host, rctx) => mountSettings(host, rctx.settings),
     }),
   )
 }

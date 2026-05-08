@@ -13,6 +13,7 @@ import type {
 export interface CtxBridge {
   ipc: {
     invoke<T = unknown>(channel: string, args?: unknown): Promise<T>
+    on?(channel: string, cb: (payload: unknown) => void): { dispose(): void }
   }
   ui: {
     confirm(opts: { title: string; message: string; confirmLabel?: string; cancelLabel?: string }): Promise<boolean>
@@ -35,7 +36,6 @@ interface PaneProps {
   activeTabCwd: string | null
   onPatchState: (patch: Partial<FileBrowserState>) => void
   onClipboard: (clip: FileBrowserClipboard | null) => void
-  onClose?: () => void
   onOpenEditor?: (path: string, backend: FileBackend) => void
 }
 
@@ -52,7 +52,7 @@ function shellQuote(s: string): string {
 }
 
 export function FileBrowserPane(props: PaneProps): React.JSX.Element {
-  const { ctx, state, backend, activeTabCwd, onPatchState, onClipboard, onClose, onOpenEditor } = props
+  const { ctx, state, backend, activeTabCwd, onPatchState, onClipboard, onOpenEditor } = props
   const fb = useFileBrowser({
     ipc: ctx.ipc,
     backend,
@@ -119,7 +119,7 @@ export function FileBrowserPane(props: PaneProps): React.JSX.Element {
 
   const handleNavigate = useCallback(
     (target: string) => {
-      onPatchState({ cwd: target, selectedPath: null })
+      onPatchState({ cwd: target, selectedPath: null, expandedPaths: [] })
     },
     [onPatchState],
   )
@@ -156,11 +156,6 @@ export function FileBrowserPane(props: PaneProps): React.JSX.Element {
     onPatchState({ showHidden: !state.showHidden })
   }, [onPatchState, state.showHidden])
 
-  const handleClose = useCallback(() => {
-    if (onClose) onClose()
-    else onPatchState({ visible: false })
-  }, [onClose, onPatchState])
-
   const handleReconnect = useCallback(async () => {
     if (backend?.kind !== 'sftp') return
     void fb.refreshRoot()
@@ -169,7 +164,7 @@ export function FileBrowserPane(props: PaneProps): React.JSX.Element {
   const onActivate = useCallback(
     async (node: FileNode) => {
       if (node.kind === 'dir') {
-        onPatchState({ cwd: node.path, selectedPath: node.path })
+        onPatchState({ cwd: node.path, selectedPath: node.path, expandedPaths: [] })
         return
       }
       if (backend && onOpenEditor) {
