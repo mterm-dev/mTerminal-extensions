@@ -148,7 +148,7 @@
         {
           "id": "commit",
           "label": "Commit message generator",
-          "description": "Picks the AI provider and model used when you click the ✨ Generate button. Install providers from Settings → AI. By default keys come from the central vault; switch to ‘Custom key’ if you want a per-workflow override."
+          "description": "Model used by the ✨ Generate button."
         }
       ]
     }
