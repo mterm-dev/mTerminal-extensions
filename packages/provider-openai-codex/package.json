@@ -18,7 +18,7 @@
     "@mterminal/extension-api": "^1.4.0"
   },
   "dependencies": {
-    "@openai/codex-sdk": "^0.1.0"
+    "@openai/codex-sdk": "^0.129.0"
   },
   "devDependencies": {
     "@mterminal/extension-api": "workspace:^",

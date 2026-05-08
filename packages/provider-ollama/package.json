@@ -18,7 +18,7 @@
     "@mterminal/extension-api": "^1.4.0"
   },
   "dependencies": {
-    "ollama": "^0.5.10"
+    "ollama": "^0.6.3"
   },
   "devDependencies": {
     "@mterminal/extension-api": "workspace:^",
