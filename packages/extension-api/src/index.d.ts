@@ -678,16 +678,6 @@ export interface AiApi {
   stream(req: AiStreamReq): AsyncIterable<AiDelta>
   registerProvider(p: AiProviderImpl): Disposable
   listProviders(): AiProviderInfo[]
-  /**
-   * Returns the live SDK client published by an AI provider extension as the
-   * service `ai.sdk.<providerId>`, or null if the provider is not active.
-   * Bypasses the manifest `consumedServices` declaration — escape hatch for
-   * casual consumers. For typed access with proper service lifecycle, declare
-   * `consumedServices: { 'ai.sdk.<id>': { versionRange: '^1.0.0' } }` and use
-   * `ctx.services['ai.sdk.<id>']`.
-   * @since mterminal-api 1.4.0
-   */
-  getSdk<T = unknown>(providerId: string): T | null
 }
 
 export interface GitStatusEntry {

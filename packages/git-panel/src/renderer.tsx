@@ -14,16 +14,16 @@ import type { ExtensionContext } from "@mterminal/extension-api";
  * The panel stays props-shaped. The wrapper here adapts ctx → props so the
  * panel itself doesn't have to be rewritten field-by-field.
  *
- * After the SDK-as-extension refactor the AI side is fully unified through
- * `ctx.ai.stream()` — installed AI provider extensions own their SDK clients
- * and vault keys, and the host's `<AiBindingCard>` auto-renders provider +
- * model picking inside Settings → Extensions → Git Panel.
+ * The AI side is unified through `ctx.ai.stream()`. The host's
+ * `<AiBindingCard>` auto-renders provider + model picking inside
+ * Settings → Extensions → Git Panel.
  *
  * Two source modes:
- *   • "core"   — use the provider extension's vault key from Settings → AI.
+ *   • "core"   — use the global vault key from Settings → AI.
  *   • "custom" — read a per-binding key from `ctx.secrets` and pass it as
- *     `apiKey` to `ctx.ai.stream()`; the provider extension instantiates an
- *     ad-hoc SDK client for the call only.
+ *     `apiKey` to `ctx.ai.stream()`; the host instantiates an ad-hoc SDK
+ *     client for that call only and falls back to the global key when no
+ *     override is supplied.
  */
 
 export interface AiBindingConfig {

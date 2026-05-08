@@ -13,12 +13,9 @@ packages/
   error-linkifier/           detects file:line:col patterns in terminal output
   git-status-mini/           small Git status panel
   theme-pack-extra/          extra terminal themes (oxocarbon, rose pine pine)
-  provider-anthropic/        Anthropic AI provider — bundles @anthropic-ai/sdk, publishes ai.sdk.anthropic
-  provider-openai-codex/     OpenAI Codex AI provider — bundles @openai/codex-sdk, publishes ai.sdk.openai-codex
-  provider-ollama/           Ollama AI provider — bundles ollama-js, publishes ai.sdk.ollama
 ```
 
-The three `provider-*` packages register an AI provider via `ctx.ai.registerProvider()` AND publish the live SDK client as a service (`ai.sdk.<id>`) so other extensions can drive the full SDK API for advanced flows (Codex agent loops, Anthropic Agent SDK, Ollama embeddings, etc.).
+AI providers (Anthropic, OpenAI Codex, Ollama) live in mTerminal core, not as separate extensions. Extensions still get a unified `ctx.ai.complete()` / `ctx.ai.stream()` surface plus per-call `apiKey` / `baseUrl` overrides for binding-specific keys.
 
 pnpm workspace. Each extension package is published independently to the marketplace as a `.mtx` bundle. `extension-api` is internal to this repo and not published as `.mtx`.
 
