@@ -74,8 +74,8 @@ export async function activate(ctx: ExtensionContext): Promise<void> {
     await rebuild()
 
     ctx.subscribe(
-      ctx.vault.onChange('ai_keys.anthropic', () => {
-        void rebuild()
+      ctx.vault.onChange((key) => {
+        if (key === 'ai_keys.anthropic') void rebuild()
       }),
     )
     ctx.subscribe(

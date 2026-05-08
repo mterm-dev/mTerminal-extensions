@@ -43,7 +43,8 @@ function flattenPrompt(req: CompleteReq): string {
   const parts: string[] = []
   if (req.system) parts.push(`System: ${req.system}`)
   for (const m of req.messages) {
-    parts.push(`${m.role[0].toUpperCase()}${m.role.slice(1)}: ${m.content}`)
+    const head = m.role.charAt(0).toUpperCase()
+    parts.push(`${head}${m.role.slice(1)}: ${m.content}`)
   }
   return parts.join('\n\n')
 }
@@ -80,8 +81,8 @@ export async function activate(ctx: ExtensionContext): Promise<void> {
     await rebuild()
 
     ctx.subscribe(
-      ctx.vault.onChange('ai_keys.openai-codex', () => {
-        void rebuild()
+      ctx.vault.onChange((key) => {
+        if (key === 'ai_keys.openai-codex') void rebuild()
       }),
     )
     ctx.subscribe(
