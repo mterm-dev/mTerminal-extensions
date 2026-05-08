@@ -6,93 +6,33 @@ import {
   DEFAULT_GIT_PANEL_SETTINGS,
   type GitPanelSettings,
 } from "./types";
+import type { ExtensionContext } from "@mterminal/extension-api";
 
 /**
  * Renderer entry for the git-panel extension.
  *
  * The panel stays props-shaped. The wrapper here adapts ctx → props so the
- * panel itself doesn't have to be rewritten field-by-field. AI provider
- * config flows through the `ai.binding.commit` settings entry, populated by
- * the host's auto-rendered AI binding card. Custom-mode keys come from
- * `ctx.secrets`. Core-mode requests go through `window.mt.ai`.
+ * panel itself doesn't have to be rewritten field-by-field.
+ *
+ * After the SDK-as-extension refactor the AI side is unified through
+ * `ctx.ai.stream()` — there is no per-extension API key storage anymore. The
+ * binding only stores `{ provider, model, baseUrl }` (provider id is whatever
+ * the user has installed) and the registered AI provider extension handles
+ * keys via the host vault.
  */
 
-export type AiProviderId = "anthropic" | "openai" | "ollama";
-
 export interface AiBindingConfig {
-  source: "core" | "custom";
-  provider: AiProviderId;
+  provider: string;
   model: string;
   baseUrl?: string;
 }
 
-export interface SecretsApiLite {
-  get(key: string): Promise<string | null>;
-  set(key: string, value: string): Promise<void>;
-  delete(key: string): Promise<void>;
-  has(key: string): Promise<boolean>;
-  keys(): Promise<string[]>;
-  onChange(cb: (key: string, present: boolean) => void): { dispose: () => void };
-}
-
-interface ExtCtx {
-  id: string;
-  logger: { info: (...a: unknown[]) => void; warn: (...a: unknown[]) => void };
-  panels: {
-    register(p: {
-      id: string;
-      title: string;
-      location: string;
-      render: (host: HTMLElement) => void | (() => void);
-    }): { dispose: () => void };
-  };
-  commands: {
-    register(c: { id: string; title?: string; run: () => unknown }): {
-      dispose: () => void;
-    };
-  };
-  settings: {
-    get<T = unknown>(key: string): T | undefined;
-    set(key: string, value: unknown): void | Promise<void>;
-    onChange(cb: (key: string, value: unknown) => void): { dispose: () => void };
-  };
-  settingsRenderer: {
-    register(spec: {
-      render(
-        host: HTMLElement,
-        ctx: {
-          host: HTMLElement;
-          extId: string;
-          settings: {
-            get<T = unknown>(key: string): T | undefined;
-            set(key: string, value: unknown): void | Promise<void>;
-            onChange(
-              cb: (key: string, value: unknown) => void,
-            ): { dispose: () => void };
-          };
-        },
-      ): void | (() => void);
-    }): { dispose: () => void };
-  };
-  events: {
-    emit(event: string, payload?: unknown): void;
-    on(event: string, cb: (payload: unknown) => void): { dispose: () => void };
-  };
-  workspace: { cwd(): string | null };
-  secrets: SecretsApiLite;
-  ui: {
-    toast(opts: { kind?: "info" | "success" | "warn" | "error"; message: string }): void;
-  };
-  subscribe(d: { dispose: () => void } | (() => void)): void;
-}
-
 const DEFAULT_AI_BINDING: AiBindingConfig = {
-  source: "core",
-  provider: "anthropic",
-  model: "claude-sonnet-4-5",
+  provider: "",
+  model: "",
 };
 
-function readSettings(ctx: ExtCtx): GitPanelSettings {
+function readSettings(ctx: ExtensionContext): GitPanelSettings {
   const get = <K extends keyof GitPanelSettings>(key: K): GitPanelSettings[K] => {
     const v = ctx.settings.get<GitPanelSettings[K]>(key);
     return v !== undefined ? v : DEFAULT_GIT_PANEL_SETTINGS[key];
@@ -103,18 +43,17 @@ function readSettings(ctx: ExtCtx): GitPanelSettings {
   };
 }
 
-function readBinding(ctx: ExtCtx): AiBindingConfig {
-  const cfg = ctx.settings.get<AiBindingConfig>("ai.binding.commit");
+function readBinding(ctx: ExtensionContext): AiBindingConfig {
+  const cfg = ctx.settings.get<Partial<AiBindingConfig> & { provider?: unknown; model?: unknown }>("ai.binding.commit");
   if (!cfg || typeof cfg !== "object") return DEFAULT_AI_BINDING;
   return {
-    source: cfg.source === "custom" ? "custom" : "core",
-    provider: cfg.provider ?? DEFAULT_AI_BINDING.provider,
-    model: cfg.model || DEFAULT_AI_BINDING.model,
-    baseUrl: cfg.baseUrl,
+    provider: typeof cfg.provider === "string" ? cfg.provider : DEFAULT_AI_BINDING.provider,
+    model: typeof cfg.model === "string" ? cfg.model : DEFAULT_AI_BINDING.model,
+    baseUrl: typeof cfg.baseUrl === "string" ? cfg.baseUrl : undefined,
   };
 }
 
-function GitPanelMount({ ctx }: { ctx: ExtCtx }) {
+function GitPanelMount({ ctx }: { ctx: ExtensionContext }) {
   const [cwd, setCwd] = useState<string | undefined>(() => ctx.workspace.cwd() ?? undefined);
   const [collapsed, setCollapsed] = useState<boolean>(
     () => (ctx.settings.get<boolean>("collapsed") ?? false),
@@ -168,7 +107,7 @@ function GitPanelMount({ ctx }: { ctx: ExtCtx }) {
       }}
       settings={settings}
       binding={binding}
-      secrets={ctx.secrets}
+      ai={ctx.ai}
       height={height}
       onResizeHeight={(h) => {
         setHeight(h);
@@ -187,7 +126,7 @@ function GitPanelMount({ ctx }: { ctx: ExtCtx }) {
   );
 }
 
-export function activate(ctx: ExtCtx): void {
+export function activate(ctx: ExtensionContext): void {
   ctx.logger.info("git-panel activated");
 
   let root: Root | null = null;

@@ -1,12 +1,12 @@
 {
   "name": "@mterminal/ext-git-panel",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Full-featured Git panel for mTerminal",
   "license": "MIT",
   "type": "module",
   "renderer": "dist/renderer.mjs",
   "engines": {
-    "mterminal-api": "^1.0.0"
+    "mterminal-api": "^1.4.0"
   },
   "scripts": {
     "build": "tsup",
@@ -15,7 +15,7 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "@mterminal/extension-api": "^1.0.0",
+    "@mterminal/extension-api": "^1.4.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -148,19 +148,7 @@
         {
           "id": "commit",
           "label": "Commit message generator",
-          "description": "Picks the model used by the Generate button. Choose mTerminal's shared AI providers (vault keys) or use a private key scoped to this extension.",
-          "supportsCore": true,
-          "providers": [
-            "anthropic",
-            "openai",
-            "ollama"
-          ],
-          "defaultProvider": "anthropic",
-          "defaultModels": {
-            "anthropic": "claude-sonnet-4-5",
-            "openai": "gpt-4o-mini",
-            "ollama": "llama3.1"
-          }
+          "description": "Picks the AI provider and model used by the Generate button. Install providers from Settings → AI; their API keys are managed centrally in the host vault."
         }
       ]
     }

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { useGitStatus, type GitFile } from "../hooks/useGitStatus";
 import { GitDiffModal } from "../components/GitDiffModal";
-import { streamComplete, streamCompleteCore } from "../lib/ai-client";
 import type { GitPanelSettings as Settings } from "../types";
-import type { AiBindingConfig, SecretsApiLite } from "../renderer";
+import type { AiBindingConfig } from "../renderer";
+import type { AiApi } from "@mterminal/extension-api";
 import {
   buildTree,
   collectDirPaths,
@@ -68,7 +68,7 @@ interface Props {
   onToggleTreeView: (b: boolean) => void;
   settings: Settings;
   binding: AiBindingConfig;
-  secrets: SecretsApiLite;
+  ai: AiApi;
   height: number;
   onResizeHeight: (h: number) => void;
   msgHeight: number;
@@ -91,7 +91,7 @@ export function GitPanel({
   onToggleTreeView,
   settings,
   binding,
-  secrets,
+  ai,
   height,
   onResizeHeight,
   msgHeight,
@@ -354,26 +354,14 @@ export function GitPanel({
       return;
     }
 
-    const { source, provider, model, baseUrl } = binding;
+    const { provider, model } = binding;
+    if (!provider.trim()) {
+      setAiError("pick an AI provider in settings → extensions → git panel");
+      return;
+    }
     if (!model.trim()) {
       setAiError("pick a model in settings → extensions → git panel");
       return;
-    }
-
-    let apiKey: string | null = null;
-    if (source === "custom" && (provider === "anthropic" || provider === "openai")) {
-      try {
-        apiKey = await secrets.get(`ai.commit.${provider}.apiKey`);
-      } catch (e) {
-        setAiError((e as Error).message);
-        return;
-      }
-      if (!apiKey || !apiKey.trim()) {
-        setAiError(
-          `${provider} api key not set — open settings → extensions → git panel`,
-        );
-        return;
-      }
     }
 
     const MAX = 30_000;
@@ -402,38 +390,39 @@ export function GitPanel({
 
     setAiBusy(true);
     setMessage("");
-    const common = {
-      provider,
-      model,
-      baseUrl,
-      system: settings.commitSystemPrompt,
-      messages: [
-        { role: "user" as const, content: FEW_SHOT_DIFF },
-        { role: "assistant" as const, content: FEW_SHOT_COMMIT },
-        {
-          role: "user" as const,
-          content: `Generate a commit message for the following staged changes:\n\n${payload}`,
-        },
-      ],
-      maxTokens: 500,
-      temperature: 0,
-      topP: 0.1,
-      onDelta: (d: string) => setMessage((prev) => prev + d),
-      onDone: () => {
+
+    const controller = new AbortController();
+    aiCancelRef.current = () => controller.abort();
+
+    void (async () => {
+      try {
+        const stream = ai.stream({
+          provider,
+          model,
+          system: settings.commitSystemPrompt,
+          messages: [
+            { role: "user", content: FEW_SHOT_DIFF },
+            { role: "assistant", content: FEW_SHOT_COMMIT },
+            {
+              role: "user",
+              content: `Generate a commit message for the following staged changes:\n\n${payload}`,
+            },
+          ],
+          signal: controller.signal,
+        });
+        for await (const delta of stream) {
+          if (controller.signal.aborted) break;
+          if (delta.text) setMessage((prev) => prev + delta.text);
+          if (delta.finished) break;
+        }
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setAiError(err instanceof Error ? err.message : String(err));
+      } finally {
         aiCancelRef.current = null;
         setAiBusy(false);
-      },
-      onError: (e: string) => {
-        aiCancelRef.current = null;
-        setAiBusy(false);
-        setAiError(e);
-      },
-    };
-    const handle =
-      source === "core"
-        ? streamCompleteCore(common)
-        : streamComplete({ ...common, apiKey: apiKey ?? undefined });
-    aiCancelRef.current = handle.cancel;
+      }
+    })();
   };
 
   const onResizeHeightStart = (e: RPointerEvent<HTMLDivElement>) => {
