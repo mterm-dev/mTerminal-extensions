@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { RemoteSshPanel } from './components/RemoteSshPanel'
 import { HostEditorModal } from './components/HostEditorModal'
 import { RemoteTerminalTab } from './terminal/RemoteTerminalTab'
+import { mountSettings } from './settings'
 import { useHostRegistry, type ExtIpcLite } from './hooks/useHostRegistry'
 import { GROUP_ACCENTS } from './shared/types'
 import type {
@@ -73,6 +74,27 @@ interface ExtCtx {
     set(key: string, value: string): Promise<void>
     delete(key: string): Promise<void>
     has(key: string): Promise<boolean>
+  }
+  settings: {
+    get<T = unknown>(key: string): T | undefined
+    set(key: string, value: unknown): void | Promise<void>
+    onChange(cb: (key: string, value: unknown) => void): { dispose(): void }
+  }
+  settingsRenderer: {
+    register(spec: {
+      render(
+        host: HTMLElement,
+        ctx: {
+          host: HTMLElement
+          extId: string
+          settings: {
+            get<T = unknown>(key: string): T | undefined
+            set(key: string, value: unknown): void | Promise<void>
+            onChange(cb: (key: string, value: unknown) => void): { dispose(): void }
+          }
+        },
+      ): void | (() => void)
+    }): { dispose(): void }
   }
   providedServices: {
     publish<T>(id: string, impl: T): { dispose(): void }
@@ -857,6 +879,12 @@ export function activate(ctx: ExtCtx): void {
     ctx.keybindings.register({
       command: 'remoteSsh.openHostsPanel',
       key: 'Ctrl+Shift+G',
+    }),
+  )
+
+  ctx.subscribe(
+    ctx.settingsRenderer.register({
+      render: (host, rctx) => mountSettings(host, rctx.settings),
     }),
   )
 
