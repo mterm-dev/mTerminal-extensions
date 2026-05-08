@@ -11,7 +11,7 @@
  * `host` setting.
  */
 
-import { Ollama } from 'ollama'
+import { Ollama } from 'ollama/browser'
 import type { Disposable, ExtensionContext } from '@mterminal/extension-api'
 
 interface CompleteReq {
