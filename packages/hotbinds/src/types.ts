@@ -34,6 +34,41 @@ export interface ExtCtx {
       insertAtPrompt(data: string): Promise<void>
     } | null
   }
+  settingsRenderer: {
+    register(spec: {
+      render(
+        host: HTMLElement,
+        ctx: {
+          host: HTMLElement
+          extId: string
+          settings: {
+            get<T = unknown>(key: string): T | undefined
+            set(key: string, value: unknown): void | Promise<void>
+            onChange(cb: (key: string, value: unknown) => void): { dispose(): void }
+          }
+        },
+      ): void | (() => void)
+    }): { dispose(): void }
+  }
+  panels: {
+    register(panel: {
+      id: string
+      title: string
+      icon?: string
+      location: 'sidebar' | 'sidebar.bottom' | 'bottombar'
+      initialCollapsed?: boolean
+      render(host: HTMLElement, panelCtx: {
+        host: HTMLElement
+        width: number
+        height: number
+        visible: boolean
+        onResize(cb: (rect: DOMRect) => void): { dispose(): void }
+        onVisibilityChange(cb: (v: boolean) => void): { dispose(): void }
+      }): void | (() => void)
+    }): { dispose(): void }
+    show(id: string): void
+    hide(id: string): void
+  }
   statusBar: {
     register(item: {
       id: string

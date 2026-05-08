@@ -1,5 +1,6 @@
 import { fire } from './insert'
-import { openManager } from './manager'
+import { mountManager, openManager } from './manager'
+import { registerPanel } from './panel'
 import type { Binding, ExtCtx } from './types'
 
 export function activate(ctx: ExtCtx): void {
@@ -50,6 +51,14 @@ export function activate(ctx: ExtCtx): void {
       id: 'hotbinds.manage',
       title: 'Hotbinds: Manage bindings',
       run: () => void openManager(ctx),
+    }),
+  )
+
+  ctx.subscribe(registerPanel(ctx))
+
+  ctx.subscribe(
+    ctx.settingsRenderer.register({
+      render: (host) => mountManager(ctx, host),
     }),
   )
 

@@ -51,6 +51,14 @@
           "key": "Ctrl+Alt+H"
         }
       ],
+      "panels": [
+        {
+          "id": "hotbinds-panel",
+          "title": "Hotbinds",
+          "location": "sidebar.bottom",
+          "initialCollapsed": true
+        }
+      ],
       "settings": {
         "type": "object",
         "properties": {

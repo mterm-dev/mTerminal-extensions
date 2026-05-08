@@ -545,9 +545,11 @@ function SubmitToggle({
 function Manager({
   ctx,
   ctrl,
+  embedded = false,
 }: {
   ctx: ExtCtx
-  ctrl: { close(result?: unknown): void }
+  ctrl?: { close(result?: unknown): void }
+  embedded?: boolean
 }): React.ReactElement {
   const initial = (ctx.settings.get<Binding[]>('bindings') ?? []) as Binding[]
   const [items, setItems] = useState<Binding[]>(() => initial.map((b) => ({ ...b })))
@@ -603,10 +605,44 @@ function Manager({
       kind: 'success',
       message: `Hotbinds: saved ${cleaned.length} binding${cleaned.length === 1 ? '' : 's'}`,
     })
-    ctrl.close()
+    ctrl?.close()
   }
 
+  // External-change sync (other window / modal saves while panel is open)
   useEffect(() => {
+    if (!embedded) return
+    const off = ctx.settings.onChange((key) => {
+      if (key !== 'bindings') return
+      const next = (ctx.settings.get<Binding[]>('bindings') ?? []) as Binding[]
+      setItems((prev) => {
+        // If the data is identical, don't blow away local edits
+        if (JSON.stringify(prev) === JSON.stringify(next)) return prev
+        return next.map((b) => ({ ...b }))
+      })
+    })
+    return () => off.dispose()
+  }, [ctx, embedded])
+
+  // Embedded autosave: persist only well-formed bindings, ~250ms debounce.
+  const isFirst = useRef(true)
+  useEffect(() => {
+    if (!embedded) return
+    if (isFirst.current) {
+      isFirst.current = false
+      return
+    }
+    const t = setTimeout(() => {
+      const cleaned = items
+        .map((b) => ({ ...b, name: b.name.trim(), key: b.key.trim(), text: b.text }))
+        .filter((b) => b.key.length > 0)
+      void ctx.settings.set('bindings', cleaned)
+    }, 250)
+    return () => clearTimeout(t)
+  }, [items, embedded, ctx])
+
+  // Modal Ctrl+S shortcut
+  useEffect(() => {
+    if (embedded) return
     const onKey = (e: KeyboardEvent): void => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
@@ -616,7 +652,7 @@ function Manager({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items])
+  }, [items, embedded])
 
   const count = items.length
   const valid = items.filter((b) => b.key.trim().length > 0).length
@@ -723,30 +759,56 @@ function Manager({
         )}
       </div>
 
-      <div className="hb-foot">
-        <span className="hb-foot-hint">
-          <kbd>Ctrl</kbd>+<kbd>S</kbd> save · <kbd>Esc</kbd> close
-        </span>
-        <span className="hb-spacer" />
-        <button className="hb-btn subtle" onClick={() => ctrl.close()} type="button">
-          Cancel
-        </button>
-        <button
-          className="hb-btn primary"
-          onClick={() => void save()}
-          type="button"
-          disabled={items.some((b) => !b.key.trim())}
-          title={
-            items.some((b) => !b.key.trim())
-              ? 'Some bindings still need a shortcut'
-              : 'Save all bindings'
-          }
-        >
-          Save
-        </button>
-      </div>
+      {embedded ? (
+        <div className="hb-foot">
+          <span className="hb-foot-hint">
+            changes save automatically · open full manager with{' '}
+            <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>H</kbd>
+          </span>
+        </div>
+      ) : (
+        <div className="hb-foot">
+          <span className="hb-foot-hint">
+            <kbd>Ctrl</kbd>+<kbd>S</kbd> save · <kbd>Esc</kbd> close
+          </span>
+          <span className="hb-spacer" />
+          <button className="hb-btn subtle" onClick={() => ctrl?.close()} type="button">
+            Cancel
+          </button>
+          <button
+            className="hb-btn primary"
+            onClick={() => void save()}
+            type="button"
+            disabled={items.some((b) => !b.key.trim())}
+            title={
+              items.some((b) => !b.key.trim())
+                ? 'Some bindings still need a shortcut'
+                : 'Save all bindings'
+            }
+          >
+            Save
+          </button>
+        </div>
+      )}
     </div>
   )
+}
+
+/**
+ * Mount the manager UI directly into a host element (used by the
+ * `settingsRenderer` API for the in-Settings card).
+ */
+export function mountManager(ctx: ExtCtx, host: HTMLElement): () => void {
+  ensureStyles()
+  const root = createRoot(host)
+  root.render(<Manager ctx={ctx} embedded />)
+  return () => {
+    try {
+      root.unmount()
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 export async function openManager(ctx: ExtCtx): Promise<void> {
