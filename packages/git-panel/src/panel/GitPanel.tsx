@@ -245,12 +245,39 @@ export function GitPanel({
             "host does not implement mt.git.discardPaths — update mTerminal to enable per-file rollback",
           );
         }
-        await api.discardPaths(cwd, [toPathspec(f.path)]);
+        await api.discardPaths(cwd, [f.path]);
       });
       setPathsChecked([f.path], false);
       setActionInfo(`rolled back ${f.path}`);
     } catch (e) {
       reportActionError(f.untracked ? "delete failed" : "rollback failed", e);
+    }
+  };
+
+  const deleteFile = async (f: GitFile) => {
+    if (!cwd) return;
+    const ok = await ui.confirm({
+      title: "delete file",
+      message: `Delete '${f.path}'?\n\nThis cannot be undone.`,
+      confirmLabel: "delete",
+      danger: true,
+    });
+    if (!ok) return;
+    setActionError(null);
+    setActionInfo(null);
+    try {
+      await runMutation(async (api) => {
+        if (typeof api.deleteFile !== "function") {
+          throw new Error(
+            "host does not implement mt.git.deleteFile — update mTerminal to enable file deletion",
+          );
+        }
+        await api.deleteFile(cwd, f.path);
+      });
+      setPathsChecked([f.path], false);
+      setActionInfo(`deleted ${f.path}`);
+    } catch (e) {
+      reportActionError("delete failed", e);
     }
   };
 
@@ -962,6 +989,7 @@ export function GitPanel({
           state={fileMenu}
           onClose={() => setFileMenu(null)}
           onRollback={(f) => void rollbackFile(f)}
+          onDelete={(f) => void deleteFile(f)}
         />
       )}
 

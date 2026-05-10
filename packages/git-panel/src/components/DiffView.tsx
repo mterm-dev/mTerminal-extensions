@@ -55,7 +55,7 @@ export function DiffView({
       {error && <div className="git-diff-error">{error}</div>}
       {!error && loading && <div className="git-diff-loading">loading…</div>}
       {isEmpty && <div className="git-diff-empty">{emptyText}</div>}
-      {!error && !loading && !isEmpty && view === "side" && (
+      {!error && !loading && !isEmpty && view === "side" && rows.length > 0 && (
         <div className="git-diff-wrap">
           <div className="git-diff-cols" role="presentation" ref={scrollRef}>
             {rows.map((row, i) => (
@@ -65,6 +65,15 @@ export function DiffView({
           <DiffMinimap
             markers={sideMarkers}
             onJump={(frac) => scrollTo(scrollRef.current, frac)}
+          />
+        </div>
+      )}
+      {!error && !loading && !isEmpty && view === "side" && rows.length === 0 && (
+        <div className="git-diff-wrap">
+          <UnifiedView text={text} preRef={preRef} />
+          <DiffMinimap
+            markers={unifiedMarkers}
+            onJump={(frac) => scrollTo(preRef.current, frac)}
           />
         </div>
       )}
