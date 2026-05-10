@@ -63,25 +63,38 @@ export interface FileBrowserClipboard {
   backend: FileBackend
 }
 
+export interface FileEditorTab {
+  path: string
+  backend: FileBackend
+}
+
 export interface FileBrowserState {
   visible: boolean
   cwd: string | null
   width: number
+  treeWidth: number
+  editorWidth: number
   showHidden: boolean
   selectedPath: string | null
   expandedPaths: string[]
   backend: FileBackend | null
   clipboard: FileBrowserClipboard | null
+  editorTabs: FileEditorTab[]
+  activeEditorPath: string | null
 }
 
 export const DEFAULT_BROWSER_STATE: Omit<FileBrowserState, 'backend'> = {
   visible: true,
   cwd: null,
   width: 320,
+  treeWidth: 320,
+  editorWidth: 600,
   showHidden: true,
   selectedPath: null,
   expandedPaths: [],
   clipboard: null,
+  editorTabs: [],
+  activeEditorPath: null,
 }
 
 export interface FileNode {

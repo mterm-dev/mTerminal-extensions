@@ -85,10 +85,13 @@ interface Props {
   ctx: CtxBridge
   backend: FileBackend
   path: string
-  onClose: () => void
+  initialContent?: string
+  initialOriginal?: string
+  onBufferChange?: (path: string, text: string, original: string) => void
+  onRequestClose: (path: string) => void
 }
 
-function basename(p: string, backend: FileBackend): string {
+export function basename(p: string, backend: FileBackend): string {
   const sep = backend.kind === 'sftp' || !p.includes('\\') ? '/' : '\\'
   const idx = p.lastIndexOf(sep)
   return idx >= 0 ? p.slice(idx + 1) : p
@@ -436,14 +439,23 @@ const editorTheme = EditorView.theme(
   { dark: true },
 )
 
-export function FileEditor({ ctx, backend, path, onClose }: Props): React.JSX.Element {
+export function FileEditor({
+  ctx,
+  backend,
+  path,
+  initialContent,
+  initialOriginal,
+  onBufferChange,
+  onRequestClose,
+}: Props): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const viewRef = useRef<EditorView | null>(null)
   const langCompartment = useRef(new Compartment())
-  const [loading, setLoading] = useState(true)
+  const hasInitial = initialContent !== undefined
+  const [loading, setLoading] = useState(!hasInitial)
   const [error, setError] = useState<string | null>(null)
-  const [original, setOriginal] = useState<string>('')
-  const [text, setText] = useState<string>('')
+  const [original, setOriginal] = useState<string>(initialOriginal ?? initialContent ?? '')
+  const [text, setText] = useState<string>(initialContent ?? '')
   const [saving, setSaving] = useState(false)
 
   const fileName = useMemo(() => basename(path, backend), [path, backend])
@@ -455,10 +467,16 @@ export function FileEditor({ ctx, backend, path, onClose }: Props): React.JSX.El
   textRef.current = text
   const originalRef = useRef(original)
   originalRef.current = original
-  const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
+  const onRequestCloseRef = useRef(onRequestClose)
+  onRequestCloseRef.current = onRequestClose
+  const onBufferChangeRef = useRef(onBufferChange)
+  onBufferChangeRef.current = onBufferChange
   const saveRef = useRef<() => Promise<boolean>>(async () => true)
-  const requestCloseRef = useRef<() => Promise<void>>(async () => {})
+  const requestCloseRef = useRef<() => void>(() => {})
+
+  useEffect(() => {
+    onBufferChangeRef.current?.(path, text, original)
+  }, [text, original, path])
 
   const save = useCallback(async (): Promise<boolean> => {
     if (!dirtyRef.current) return true
@@ -481,23 +499,15 @@ export function FileEditor({ ctx, backend, path, onClose }: Props): React.JSX.El
     }
   }, [backend, ctx, fileName, path])
 
-  const requestClose = useCallback(async () => {
-    if (dirtyRef.current) {
-      const ok = await ctx.ui.confirm({
-        title: 'unsaved changes',
-        message: `discard changes to ${fileName}?`,
-        confirmLabel: 'discard',
-        cancelLabel: 'keep editing',
-      })
-      if (!ok) return
-    }
-    onCloseRef.current()
-  }, [ctx, fileName])
+  const requestClose = useCallback(() => {
+    onRequestCloseRef.current(path)
+  }, [path])
 
   saveRef.current = save
   requestCloseRef.current = requestClose
 
   useEffect(() => {
+    if (hasInitial) return
     let cancelled = false
     setLoading(true)
     setError(null)
@@ -519,7 +529,7 @@ export function FileEditor({ ctx, backend, path, onClose }: Props): React.JSX.El
     return () => {
       cancelled = true
     }
-  }, [backend, ctx, path])
+  }, [backend, ctx, path, hasInitial])
 
   useEffect(() => {
     if (loading || error) return
@@ -541,9 +551,10 @@ export function FileEditor({ ctx, backend, path, onClose }: Props): React.JSX.El
             },
           },
           {
-            key: 'Escape',
+            key: 'Mod-w',
+            preventDefault: true,
             run: () => {
-              void requestCloseRef.current()
+              requestCloseRef.current()
               return true
             },
           },
@@ -575,7 +586,7 @@ export function FileEditor({ ctx, backend, path, onClose }: Props): React.JSX.El
       }),
     ]
     const view = new EditorView({
-      state: EditorState.create({ doc: originalRef.current, extensions }),
+      state: EditorState.create({ doc: textRef.current, extensions }),
       parent: host,
     })
     viewRef.current = view
@@ -586,62 +597,36 @@ export function FileEditor({ ctx, backend, path, onClose }: Props): React.JSX.El
     }
   }, [loading, error, fileName])
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        void requestCloseRef.current()
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-        e.preventDefault()
-        e.stopPropagation()
-        void saveRef.current()
-      }
-    }
-    document.addEventListener('keydown', onKey, true)
-    return () => document.removeEventListener('keydown', onKey, true)
-  }, [])
-
   return (
-    <div
-      className="fb-editor-overlay"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) void requestClose()
-      }}
-    >
-      <div className="fb-editor-modal" role="dialog" aria-label={`edit ${fileName}`}>
-        <div className="fb-editor-header">
-          <span className="fb-editor-title" title={path}>
-            {fileName}
-            {dirty && <span className="fb-editor-dirty"> ●</span>}
-          </span>
-          <span className="fb-editor-path" title={path}>{path}</span>
-          <span className="fb-spacer" />
-          <button
-            className="ghost-btn small"
-            onClick={() => void save()}
-            disabled={!dirty || saving || loading || error !== null}
-            title="save (Ctrl+S)"
-          >
-            {saving ? 'saving…' : 'save'}
-          </button>
-          <button
-            className="ghost-btn small"
-            onClick={() => void requestClose()}
-            title="close (Esc)"
-          >
-            close
-          </button>
-        </div>
-        <div className="fb-editor-body">
-          {loading && <div className="fb-editor-status">loading…</div>}
-          {error && <div className="fb-editor-status fb-editor-error">{error}</div>}
-          {!loading && !error && <div className="fb-editor-host" ref={hostRef} />}
-        </div>
-        <div className="fb-editor-footer">
-          <span>{backend.kind === 'sftp' ? `sftp · ${backend.hostId}` : 'local'}</span>
-          <span className="fb-spacer" />
-          <span>Ctrl+S save · Esc close</span>
-        </div>
+    <div className="fb-editor-surface" role="region" aria-label={`edit ${fileName}`}>
+      <div className="fb-editor-header">
+        <span className="fb-editor-path" title={path}>{path}</span>
+        <span className="fb-spacer" />
+        <button
+          className="ghost-btn small"
+          onClick={() => void save()}
+          disabled={!dirty || saving || loading || error !== null}
+          title="save (Ctrl+S)"
+        >
+          {saving ? 'saving…' : 'save'}
+        </button>
+        <button
+          className="ghost-btn small"
+          onClick={requestClose}
+          title="close tab (Ctrl+W)"
+        >
+          close
+        </button>
+      </div>
+      <div className="fb-editor-body">
+        {loading && <div className="fb-editor-status">loading…</div>}
+        {error && <div className="fb-editor-status fb-editor-error">{error}</div>}
+        {!loading && !error && <div className="fb-editor-host" ref={hostRef} />}
+      </div>
+      <div className="fb-editor-footer">
+        <span>{backend.kind === 'sftp' ? `sftp · ${backend.hostId}` : 'local'}</span>
+        <span className="fb-spacer" />
+        <span>Ctrl+S save · Ctrl+W close</span>
       </div>
     </div>
   )

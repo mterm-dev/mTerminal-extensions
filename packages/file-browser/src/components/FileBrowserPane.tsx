@@ -44,6 +44,9 @@ interface PaneProps {
   onPatchState: (patch: Partial<FileBrowserState>) => void
   onClipboard: (clip: FileBrowserClipboard | null) => void
   onOpenEditor?: (path: string, backend: FileBackend) => void
+  onSftpDisconnected?: (hostId: string) => void
+  style?: React.CSSProperties
+  fullWidth?: boolean
 }
 
 interface MenuItem {
@@ -59,7 +62,18 @@ function shellQuote(s: string): string {
 }
 
 export function FileBrowserPane(props: PaneProps): React.JSX.Element {
-  const { ctx, state, backend, activeTabCwd, onPatchState, onClipboard, onOpenEditor } = props
+  const {
+    ctx,
+    state,
+    backend,
+    activeTabCwd,
+    onPatchState,
+    onClipboard,
+    onOpenEditor,
+    onSftpDisconnected,
+    style,
+    fullWidth,
+  } = props
   const fb = useFileBrowser({
     ipc: ctx.ipc,
     backend,
@@ -70,6 +84,17 @@ export function FileBrowserPane(props: PaneProps): React.JSX.Element {
   const paneRef = useRef<HTMLDivElement | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null)
   const [sftpStatus, setSftpStatus] = useState<'connected' | 'disconnected' | 'idle'>('idle')
+  const lastSftpStatusRef = useRef<'connected' | 'disconnected' | 'idle'>('idle')
+  useEffect(() => {
+    if (
+      backend?.kind === 'sftp' &&
+      sftpStatus === 'disconnected' &&
+      lastSftpStatusRef.current === 'connected'
+    ) {
+      onSftpDisconnected?.(backend.hostId)
+    }
+    lastSftpStatusRef.current = sftpStatus
+  }, [backend, sftpStatus, onSftpDisconnected])
 
   useEffect(() => {
     if (backend?.kind !== 'sftp') {
@@ -474,7 +499,11 @@ export function FileBrowserPane(props: PaneProps): React.JSX.Element {
   const term = ctx.terminal.active()
 
   return (
-    <div className="fb-pane" ref={paneRef}>
+    <div
+      className={'fb-pane' + (fullWidth ? ' fb-tree-full' : ' fb-tree-side')}
+      ref={paneRef}
+      style={style}
+    >
       <div className="fb-header">files</div>
       <FileBrowserToolbar
         cwd={state.cwd}
