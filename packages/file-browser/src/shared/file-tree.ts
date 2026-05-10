@@ -1,7 +1,6 @@
 import type {
   FileEntry,
   FileNode,
-  FileTreeDir,
   FileTreeState,
 } from './types'
 
@@ -10,11 +9,6 @@ export type TreeAction =
   | { type: 'load-root-start' }
   | { type: 'load-root-error'; error: string }
   | { type: 'set-entries'; parentPath: string | null; entries: FileEntry[] }
-  | {
-      type: 'set-tree'
-      rootPath: string
-      dirs: Record<string, FileTreeDir>
-    }
   | { type: 'expand'; path: string }
   | { type: 'collapse'; path: string }
   | { type: 'expand-all' }
@@ -102,55 +96,6 @@ export function reduceTree(state: FileTreeState, action: TreeAction): FileTreeSt
         }
       }
       return { ...state, nodes }
-    }
-    case 'set-tree': {
-      const nodes: Record<string, FileNode> = {}
-      const prev = state.nodes
-      let rootChildPaths: string[] | null = null
-      for (const [dirPath, dir] of Object.entries(action.dirs)) {
-        const sorted = [...dir.entries].sort(sortEntries)
-        const childPaths = sorted.map((e) => e.path)
-        for (const e of sorted) {
-          const existing = nodes[e.path] ?? prev[e.path]
-          if (existing) {
-            nodes[e.path] = {
-              ...existing,
-              kind: e.resolvedKind ?? e.kind,
-              size: e.size,
-              mtimeMs: e.mtimeMs,
-              isHidden: e.isHidden,
-            }
-          } else {
-            nodes[e.path] = entryToNode(e)
-          }
-        }
-        if (dirPath === action.rootPath) {
-          rootChildPaths = childPaths
-        }
-      }
-      for (const [dirPath, dir] of Object.entries(action.dirs)) {
-        if (dirPath === action.rootPath) continue
-        const sorted = [...dir.entries].sort(sortEntries)
-        const childPaths = sorted.map((e) => e.path)
-        const node = nodes[dirPath]
-        if (!node) continue
-        const prevNode = prev[dirPath]
-        nodes[dirPath] = {
-          ...node,
-          childPaths,
-          loaded: true,
-          loading: false,
-          error: dir.error ?? null,
-          expanded: prevNode ? prevNode.expanded : false,
-        }
-      }
-      return {
-        rootPath: action.rootPath,
-        nodes,
-        rootChildPaths,
-        loadingRoot: false,
-        rootError: null,
-      }
     }
     case 'expand': {
       const node = state.nodes[action.path]

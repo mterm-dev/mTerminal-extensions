@@ -136,102 +136,6 @@ async function listLocal(args: { cwd: string; showHidden: boolean }): Promise<Fi
   }
 }
 
-interface TreeDir {
-  entries: FileEntry[]
-  truncated?: boolean
-  error?: string
-}
-
-interface FileTreeResult {
-  cwd: string
-  parent: string | null
-  dirs: Record<string, TreeDir>
-  reachedCap: boolean
-  capDepth: number
-  capNodes: number
-}
-
-const DEFAULT_TREE_MAX_DEPTH = 8
-const DEFAULT_TREE_MAX_NODES = 5000
-
-async function listEntriesLocal(args: { cwd: string; showHidden: boolean }): Promise<TreeDir> {
-  try {
-    const dirents = await fsp.readdir(args.cwd, { withFileTypes: true })
-    const visible = args.showHidden ? dirents : dirents.filter((d) => !isHiddenName(d.name))
-    const truncated = visible.length > maxEntriesPerDir
-    const slice = truncated ? visible.slice(0, maxEntriesPerDir) : visible
-    const entries = await Promise.all(slice.map((d) => buildEntryLocal(args.cwd, d)))
-    return { entries, truncated: truncated || undefined }
-  } catch (err) {
-    return { entries: [], error: (err as Error).message }
-  }
-}
-
-async function treeLocal(args: {
-  cwd: string
-  showHidden: boolean
-  maxDepth?: number
-  maxNodes?: number
-}): Promise<FileTreeResult> {
-  const cwd = path.resolve(args.cwd)
-  const maxDepth =
-    typeof args.maxDepth === 'number' && args.maxDepth > 0 ? args.maxDepth : DEFAULT_TREE_MAX_DEPTH
-  const maxNodes =
-    typeof args.maxNodes === 'number' && args.maxNodes > 0 ? args.maxNodes : DEFAULT_TREE_MAX_NODES
-  const dirs: Record<string, TreeDir> = {}
-  const visitedReal = new Set<string>()
-  let nodeCount = 0
-  let reachedCap = false
-
-  async function walk(dirPath: string, depth: number): Promise<void> {
-    if (dirs[dirPath]) return
-    let real: string
-    try {
-      real = await fsp.realpath(dirPath)
-    } catch {
-      real = dirPath
-    }
-    if (visitedReal.has(real)) {
-      dirs[dirPath] = { entries: [] }
-      return
-    }
-    visitedReal.add(real)
-    const dir = await listEntriesLocal({ cwd: dirPath, showHidden: args.showHidden })
-    dirs[dirPath] = dir
-    nodeCount += dir.entries.length
-    if (nodeCount >= maxNodes) {
-      reachedCap = true
-      return
-    }
-    if (depth >= maxDepth) {
-      reachedCap = true
-      return
-    }
-    const subdirs = dir.entries.filter(
-      (e) => e.kind === 'dir' || (e.kind === 'symlink' && e.resolvedKind === 'dir'),
-    )
-    for (const sd of subdirs) {
-      if (nodeCount >= maxNodes) {
-        reachedCap = true
-        break
-      }
-      await walk(sd.path, depth + 1)
-    }
-  }
-
-  await walk(cwd, 0)
-
-  const parent = path.dirname(cwd)
-  return {
-    cwd,
-    parent: parent === cwd ? null : parent,
-    dirs,
-    reachedCap,
-    capDepth: maxDepth,
-    capNodes: maxNodes,
-  }
-}
-
 async function statLocal(args: { path: string }): Promise<FileStat> {
   const abs = path.resolve(args.path)
   try {
@@ -487,13 +391,6 @@ export function activate(ctx: MainCtx): void {
   if (typeof w === 'number' && w > 0) maxEntriesPerDir = w
 
   ctx.subscribe(ctx.ipc.handle('fs:list', (a) => listLocal(a as { cwd: string; showHidden: boolean })))
-  ctx.subscribe(
-    ctx.ipc.handle('fs:tree', (a) =>
-      treeLocal(
-        a as { cwd: string; showHidden: boolean; maxDepth?: number; maxNodes?: number },
-      ),
-    ),
-  )
   ctx.subscribe(ctx.ipc.handle('fs:stat', (a) => statLocal(a as { path: string })))
   ctx.subscribe(ctx.ipc.handle('fs:home', () => homeLocal()))
   ctx.subscribe(ctx.ipc.handle('fs:realpath', (a) => realpathLocal(a as { path: string })))

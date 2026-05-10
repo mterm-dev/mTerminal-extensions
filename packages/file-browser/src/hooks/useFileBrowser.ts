@@ -3,10 +3,7 @@ import { reduceTree, type TreeAction } from '../shared/file-tree'
 import {
   EMPTY_TREE,
   type FileBackend,
-  type FileEntry,
   type FileListResult,
-  type FileTreeDir,
-  type FileTreeResult,
   type FileTreeState,
   type FileStat,
 } from '../shared/types'
@@ -78,106 +75,20 @@ export function useFileBrowser(args: Args): UseFileBrowserResult {
     [backend, ipc, showHidden],
   )
 
-  const callTreeLocal = useCallback(
-    async (target: string): Promise<FileTreeResult> => {
-      return ipc.invoke<FileTreeResult>('fs:tree', {
-        cwd: target,
-        showHidden,
-      })
-    },
-    [ipc, showHidden],
-  )
-
-  const callTreeSftp = useCallback(
-    async (target: string, hostId: string): Promise<FileTreeResult> => {
-      const dirs: Record<string, FileTreeDir> = {}
-      const visitedReal = new Set<string>()
-      let nodeCount = 0
-      let reachedCap = false
-      const maxDepth = 8
-      const maxNodes = 5000
-      const walk = async (dirPath: string, depth: number): Promise<void> => {
-        if (dirs[dirPath]) return
-        let real = dirPath
-        try {
-          real = await ipc.invoke<string>('sftp:realpath', { hostId, path: dirPath })
-        } catch {
-          // fall back to dirPath as cycle key
-        }
-        if (visitedReal.has(real)) {
-          dirs[dirPath] = { entries: [] }
-          return
-        }
-        visitedReal.add(real)
-        let entries: FileEntry[] = []
-        let error: string | undefined
-        try {
-          const r = await ipc.invoke<FileListResult>('sftp:list', {
-            hostId,
-            cwd: dirPath,
-            showHidden,
-          })
-          entries = r.entries
-        } catch (err) {
-          error = (err as Error).message
-        }
-        dirs[dirPath] = { entries, error }
-        nodeCount += entries.length
-        if (nodeCount >= maxNodes) {
-          reachedCap = true
-          return
-        }
-        if (depth >= maxDepth) {
-          reachedCap = true
-          return
-        }
-        const subdirs = entries.filter(
-          (e) => e.kind === 'dir' || (e.kind === 'symlink' && e.resolvedKind === 'dir'),
-        )
-        for (const sd of subdirs) {
-          if (nodeCount >= maxNodes) {
-            reachedCap = true
-            break
-          }
-          await walk(sd.path, depth + 1)
-        }
-      }
-      await walk(target, 0)
-      const idx = target.lastIndexOf('/')
-      const parent = idx > 0 ? target.slice(0, idx) : target === '/' ? null : '/'
-      return {
-        cwd: target,
-        parent,
-        dirs,
-        reachedCap,
-        capDepth: maxDepth,
-        capNodes: maxNodes,
-      }
-    },
-    [ipc, showHidden],
-  )
-
   const refreshRoot = useCallback(async () => {
     if (!backend || !cwd) return
     cwdRef.current = cwd
     dispatch({ type: 'set-root', rootPath: cwd } as TreeAction)
     dispatch({ type: 'load-root-start' } as TreeAction)
     try {
-      const res =
-        backend.kind === 'sftp'
-          ? await callTreeSftp(cwd, backend.hostId)
-          : await callTreeLocal(cwd)
+      const res = await callList(cwd)
       if (cwdRef.current !== cwd) return
-      dispatch({
-        type: 'set-tree',
-        rootPath: cwd,
-        dirs: res.dirs,
-      } as TreeAction)
+      dispatch({ type: 'set-entries', parentPath: null, entries: res.entries } as TreeAction)
     } catch (err) {
       if (cwdRef.current !== cwd) return
       dispatch({ type: 'load-root-error', error: (err as Error).message } as TreeAction)
     }
-  }, [backend, callTreeLocal, callTreeSftp, cwd])
+  }, [backend, callList, cwd])
 
   useEffect(() => {
     void refreshRoot()

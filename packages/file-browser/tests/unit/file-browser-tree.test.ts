@@ -131,36 +131,6 @@ describe('file-tree reducer', () => {
     expect(s.rootChildPaths).toEqual(['/r/k'])
   })
 
-  it('set-tree preserves expanded state for non-root nodes after refresh', () => {
-    let s: FileTreeState = reduceTree(EMPTY_TREE, { type: 'set-root', rootPath: '/r' })
-    s = reduceTree(s, {
-      type: 'set-tree',
-      rootPath: '/r',
-      dirs: {
-        '/r': { entries: [mkEntry({ name: 'd', path: '/r/d', kind: 'dir' })] },
-        '/r/d': { entries: [mkEntry({ name: 'f', path: '/r/d/f', kind: 'file' })] },
-      },
-    })
-    expect(s.nodes['/r/d'].expanded).toBe(false)
-    s = reduceTree(s, { type: 'expand', path: '/r/d' })
-    expect(s.nodes['/r/d'].expanded).toBe(true)
-    s = reduceTree(s, {
-      type: 'set-tree',
-      rootPath: '/r',
-      dirs: {
-        '/r': { entries: [mkEntry({ name: 'd', path: '/r/d', kind: 'dir' })] },
-        '/r/d': {
-          entries: [
-            mkEntry({ name: 'f', path: '/r/d/f', kind: 'file' }),
-            mkEntry({ name: 'g', path: '/r/d/g', kind: 'file' }),
-          ],
-        },
-      },
-    })
-    expect(s.nodes['/r/d'].expanded).toBe(true)
-    expect(s.nodes['/r/d'].childPaths).toEqual(['/r/d/f', '/r/d/g'])
-  })
-
   it('hidden filter is the caller responsibility (reducer keeps everything)', () => {
     let s: FileTreeState = reduceTree(EMPTY_TREE, { type: 'set-root', rootPath: '/r' })
     s = reduceTree(s, {
