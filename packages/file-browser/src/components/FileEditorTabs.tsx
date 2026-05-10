@@ -1,5 +1,6 @@
 import React from 'react'
 import { basename } from './FileEditor'
+import { IconClose } from './icons'
 import type { FileEditorTab } from '../shared/types'
 
 interface Props {
@@ -47,7 +48,7 @@ export function FileEditorTabs({ tabs, activePath, dirtyMap, onSelect, onClose }
                 onClose(tab.path)
               }}
             >
-              ×
+              <IconClose />
             </span>
           </button>
         )

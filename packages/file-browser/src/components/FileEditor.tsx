@@ -63,6 +63,7 @@ import { diff } from '@codemirror/legacy-modes/mode/diff'
 import { cmake } from '@codemirror/legacy-modes/mode/cmake'
 import { tcl } from '@codemirror/legacy-modes/mode/tcl'
 import type { FileBackend } from '../shared/types'
+import { IconSave, IconClose } from './icons'
 
 interface CtxBridge {
   ipc: {
@@ -603,19 +604,21 @@ export function FileEditor({
         <span className="fb-editor-path" title={path}>{path}</span>
         <span className="fb-spacer" />
         <button
-          className="ghost-btn small"
+          className="ghost-btn small fb-editor-icon-btn"
           onClick={() => void save()}
           disabled={!dirty || saving || loading || error !== null}
           title="save (Ctrl+S)"
+          aria-label="save"
         >
-          {saving ? 'saving…' : 'save'}
+          <IconSave />
         </button>
         <button
-          className="ghost-btn small"
+          className="ghost-btn small fb-editor-icon-btn"
           onClick={requestClose}
           title="close tab (Ctrl+W)"
+          aria-label="close tab"
         >
-          close
+          <IconClose />
         </button>
       </div>
       <div className="fb-editor-body">

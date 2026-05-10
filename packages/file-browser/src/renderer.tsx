@@ -266,9 +266,11 @@ const CSS = `
 .fb-split {
   display: flex;
   flex-direction: row;
+  width: 100%;
   height: 100%;
   min-height: 0;
   min-width: 0;
+  overflow: hidden;
 }
 .fb-split.fb-resizing {
   cursor: col-resize;
@@ -280,21 +282,31 @@ const CSS = `
 .fb-pane.fb-tree-side {
   flex: 0 0 auto;
   min-width: 0;
+  height: 100%;
   border-right: 1px solid var(--border-subtle);
 }
 .fb-pane.fb-tree-full {
   flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
 }
 .fb-resizer {
-  flex: 0 0 4px;
+  flex: 0 0 5px;
   cursor: col-resize;
   background: transparent;
-  transition: background 120ms ease;
   position: relative;
+  z-index: 1;
 }
-.fb-resizer:hover,
-.fb-resizer.dragging {
-  background: color-mix(in oklch, var(--accent) 40%, transparent);
+.fb-resizer::after {
+  content: '';
+  position: absolute;
+  inset: 0 2px;
+  background: transparent;
+  transition: background 120ms ease;
+}
+.fb-resizer:hover::after,
+.fb-resizer.dragging::after {
+  background: color-mix(in oklch, var(--accent) 55%, transparent);
 }
 .fb-editor-side {
   flex: 1 1 auto;
@@ -302,6 +314,7 @@ const CSS = `
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  height: 100%;
   background: var(--bg-base);
   font-family: var(--font-sans);
   font-size: var(--t-sm);
@@ -310,26 +323,28 @@ const CSS = `
 .fb-tabs {
   display: flex;
   flex: none;
-  height: 28px;
+  align-items: stretch;
+  height: 30px;
   background: var(--bg-muted);
   border-bottom: 1px solid var(--border-subtle);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
 }
-.fb-tabs::-webkit-scrollbar { height: 4px; }
+.fb-tabs::-webkit-scrollbar { height: 3px; }
 .fb-tabs::-webkit-scrollbar-track { background: transparent; }
 .fb-tabs::-webkit-scrollbar-thumb { background: var(--n-250); border-radius: 2px; }
 .fb-tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0 8px 0 10px;
-  height: 28px;
-  max-width: 220px;
-  font-family: var(--font-mono);
+  padding: 0 6px 0 12px;
+  height: 30px;
+  max-width: 200px;
+  font-family: var(--font-sans);
   font-size: var(--t-xs);
-  color: var(--fg-dim);
+  color: var(--fg-muted);
   background: transparent;
   border: 0;
   border-right: 1px solid var(--border-subtle);
@@ -342,25 +357,35 @@ const CSS = `
 .fb-tab.fb-tab-active {
   background: var(--bg-base);
   color: var(--fg);
-  box-shadow: inset 0 -1px 0 var(--accent);
+}
+.fb-tab.fb-tab-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
 }
 .fb-tab-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 .fb-tab.fb-tab-dirty .fb-tab-name::before {
-  content: '• ';
+  content: '●';
   color: var(--accent);
+  font-size: 10px;
+  margin-right: 5px;
+  vertical-align: 1px;
 }
 .fb-tab-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
-  line-height: 1;
-  font-size: 14px;
+  width: 16px;
+  height: 16px;
   color: var(--fg-dim);
   border-radius: var(--r-sm);
   opacity: 0;
@@ -370,7 +395,7 @@ const CSS = `
 .fb-tab:hover .fb-tab-close,
 .fb-tab.fb-tab-active .fb-tab-close,
 .fb-tab.fb-tab-dirty .fb-tab-close {
-  opacity: 0.7;
+  opacity: 0.65;
 }
 .fb-tab-close:hover {
   opacity: 1;
@@ -388,11 +413,19 @@ const CSS = `
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
+  gap: 6px;
+  padding: 6px 8px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-muted);
   min-width: 0;
+}
+.fb-editor-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  min-width: 26px;
+  padding: 0 6px;
 }
 .fb-editor-path {
   font-family: var(--font-mono);
@@ -522,7 +555,10 @@ export function activate(ctx: ExtCtx): void {
       title: 'File Browser: Open in active group',
       run: async () => {
         const groupId = ctx.workspace.activeGroup()
-        const savedCwd = ctx.settings.get<string>('lastCwd')
+        const cwdByGroup =
+          ctx.settings.get<Record<string, string>>('lastCwdByGroup') ?? {}
+        const groupKey = groupId ?? '__none__'
+        const savedCwd = cwdByGroup[groupKey]
         const cwd = savedCwd ?? ctx.workspace.cwd() ?? undefined
         await ctx.tabs.open({
           type: 'file-browser',

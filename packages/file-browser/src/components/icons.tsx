@@ -119,3 +119,22 @@ export function IconEyeOff(): React.JSX.Element {
     </svg>
   )
 }
+
+export function IconSave(): React.JSX.Element {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3.5 2.5h7.5L13.5 5v8.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1z" />
+      <path d="M5 2.5v3.5h5.5V2.5" />
+      <rect x="4.5" y="9" width="7" height="5.5" rx="0.5" />
+    </svg>
+  )
+}
+
+export function IconClose(): React.JSX.Element {
+  return (
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 4l8 8" />
+      <path d="M12 4l-8 8" />
+    </svg>
+  )
+}

@@ -19,12 +19,23 @@ interface ExtCtx {
   ui: CtxBridge['ui']
   terminal: CtxBridge['terminal']
   events: { on(event: string, cb: (payload: unknown) => void): { dispose(): void } }
-  workspace: { cwd(): string | null }
+  workspace: {
+    cwd(): string | null
+    tabs(): Array<{ id: number; type: string; title: string; groupId: string | null; active: boolean }>
+  }
   tabs: { close(tabId: number): void }
   settings: {
     get<T = unknown>(key: string): T | undefined
     set(key: string, value: unknown): void | Promise<void>
   }
+}
+
+const NO_GROUP_KEY = '__none__'
+type CwdByGroup = Record<string, string>
+
+function readCwdByGroup(api: ExtCtx['settings']): CwdByGroup {
+  const v = api.get<CwdByGroup>('lastCwdByGroup')
+  return v && typeof v === 'object' ? v : {}
 }
 
 interface InitialProps {
@@ -58,9 +69,14 @@ export function TabBody({ ctx, tabId, initial }: Props): React.JSX.Element {
     [ipc, ctx.ui, ctx.terminal],
   )
 
+  const groupKey = useMemo(() => {
+    const summary = ctx.workspace.tabs().find((t) => t.id === tabId)
+    return summary?.groupId ?? NO_GROUP_KEY
+  }, [ctx.workspace, tabId])
+
   const [state, setState] = useState<FileBrowserState>(() => {
     const savedCwd =
-      initialBackend.kind === 'local' ? ctx.settings.get<string>('lastCwd') : undefined
+      initialBackend.kind === 'local' ? readCwdByGroup(ctx.settings)[groupKey] : undefined
     return {
       ...DEFAULT_BROWSER_STATE,
       backend: initialBackend,
@@ -74,8 +90,10 @@ export function TabBody({ ctx, tabId, initial }: Props): React.JSX.Element {
   useEffect(() => {
     if (state.backend?.kind !== 'local') return
     if (!state.cwd) return
-    void ctx.settings.set('lastCwd', state.cwd)
-  }, [ctx.settings, state.backend, state.cwd])
+    const map = readCwdByGroup(ctx.settings)
+    if (map[groupKey] === state.cwd) return
+    void ctx.settings.set('lastCwdByGroup', { ...map, [groupKey]: state.cwd })
+  }, [ctx.settings, groupKey, state.backend, state.cwd])
 
   useEffect(() => {
     if (state.cwd) return
