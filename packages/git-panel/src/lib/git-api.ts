@@ -61,6 +61,15 @@ export interface GitCommitDetail {
 
 export type GitPullStrategy = "ff-only" | "merge" | "rebase";
 
+export type ResetMode = "soft" | "mixed" | "hard";
+
+export interface StashEntry {
+  index: number;
+  message: string;
+  branch: string | null;
+  time: number;
+}
+
 export interface MtGit {
   status: (cwd: string) => Promise<GitStatus>;
   diff: (
@@ -76,6 +85,13 @@ export interface MtGit {
     message: string,
     paths?: string[],
   ) => Promise<{ commit: string }>;
+  amend: (
+    cwd: string,
+    message?: string,
+    paths?: string[],
+  ) => Promise<{ commit: string }>;
+  lastCommitMessage: (cwd: string) => Promise<string>;
+  reset: (cwd: string, ref: string, mode: ResetMode) => Promise<void>;
   push: (
     cwd: string,
     setUpstream?: boolean,
@@ -129,6 +145,18 @@ export interface MtGit {
   stashPop: (
     cwd: string,
   ) => Promise<{ stdout: string; stderr: string; conflict: boolean }>;
+  stashList: (cwd: string) => Promise<StashEntry[]>;
+  stashDrop: (cwd: string, index: number) => Promise<void>;
+  stashApply: (
+    cwd: string,
+    index: number,
+    pop?: boolean,
+  ) => Promise<{ stdout: string; stderr: string; conflict: boolean }>;
+  stashShow: (
+    cwd: string,
+    index: number,
+    context?: number,
+  ) => Promise<{ text: string; truncated: boolean }>;
   discardAll: (cwd: string) => Promise<void>;
   discardPaths?: (cwd: string, paths: string[]) => Promise<void>;
   deleteFile?: (cwd: string, filePath: string) => Promise<void>;
@@ -196,10 +224,14 @@ export function isLocalChangesPullConflict(message: string): boolean {
   return false;
 }
 
+let installedClient: MtGit | null = null;
+
+export function setGitClient(client: MtGit | null): void {
+  installedClient = client;
+}
+
 export function getGitApi(): MtGit | null {
-  if (typeof window === "undefined") return null;
-  const mt = (window as unknown as { mt?: { git?: MtGit } }).mt;
-  return mt?.git ?? null;
+  return installedClient;
 }
 
 export function toPathspec(p: string): string {

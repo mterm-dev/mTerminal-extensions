@@ -1,12 +1,13 @@
 {
   "name": "@mterminal/ext-git-panel",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Full-featured Git panel for mTerminal",
   "license": "MIT",
   "type": "module",
+  "main": "dist/main.cjs",
   "renderer": "dist/renderer.mjs",
   "engines": {
-    "mterminal-api": "^1.5.0"
+    "mterminal-api": "^1.6.0"
   },
   "scripts": {
     "build": "tsup",
@@ -49,6 +50,11 @@
     "publisher": {
       "authorId": "gh-61193738",
       "keyId": "gh-61193738:key1"
+    },
+    "providedServices": {
+      "git": {
+        "version": "1.0.0"
+      }
     },
     "contributes": {
       "panels": [

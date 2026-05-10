@@ -39,7 +39,7 @@ import { PullDialog } from "../components/PullDialog";
 import { PushDialog } from "../components/PushDialog";
 import { ConflictResolverModal } from "../components/ConflictResolverModal";
 import { FileContextMenu, type FileMenuState } from "../components/FileContextMenu";
-import { isConflictFile, toPathspec } from "../lib/git-api";
+import { getGitApi, isConflictFile, toPathspec } from "../lib/git-api";
 
 const FEW_SHOT_DIFF = `Generate a commit message for the following staged changes:
 
@@ -389,6 +389,32 @@ export function GitPanel({
         }
       });
     }
+  };
+
+  const doAmend = async () => {
+    if (!cwd) return;
+    await runAction("amend", async () => {
+      const stagePaths = files
+        .filter((f) => checked.has(f.path) && !f.staged)
+        .map((f) => toPathspec(f.path));
+      const amendPaths = checkedPaths.length > 0 ? checkedPaths.map(toPathspec) : undefined;
+      await runMutation(async (api) => {
+        if (stagePaths.length > 0) await api.stage(cwd, stagePaths);
+        await api.amend(cwd, message.trim() ? message : undefined, amendPaths);
+      });
+      setMessage("");
+      setActionInfo("amended");
+    });
+  };
+
+  const doLoadLastCommitMessage = async () => {
+    if (!cwd) return;
+    await runAction("load-amend-msg", async () => {
+      const api = getGitApi();
+      if (!api) throw new Error("git api not available");
+      const last = await api.lastCommitMessage(cwd);
+      setMessage(last);
+    });
   };
 
   const doFetch = () =>
@@ -896,6 +922,23 @@ export function GitPanel({
                   ? "pushing…"
                   : "commit & push"}
               </span>
+            </button>
+            <button
+              className="git-btn"
+              disabled={busyAction !== null}
+              onClick={() => void doAmend()}
+              title="amend last commit (uses staged + selected files; empty message keeps previous)"
+            >
+              {busyAction === "amend" ? <SpinnerIcon /> : <CommitIcon />}
+              <span>{busyAction === "amend" ? "amending…" : "amend"}</span>
+            </button>
+            <button
+              className="git-btn"
+              disabled={busyAction !== null}
+              onClick={() => void doLoadLastCommitMessage()}
+              title="load last commit message into the editor (for amend)"
+            >
+              <span>{busyAction === "load-amend-msg" ? "…" : "load msg"}</span>
             </button>
           </div>
 

@@ -7,6 +7,8 @@ import {
   type GitPanelSettings,
 } from "./types";
 import type { ExtensionContext } from "@mterminal/extension-api";
+import { createGitClient } from "./lib/git-client";
+import { setGitClient } from "./lib/git-api";
 
 /**
  * Renderer entry for the git-panel extension.
@@ -142,6 +144,11 @@ function GitPanelMount({ ctx }: { ctx: ExtensionContext }) {
 
 export function activate(ctx: ExtensionContext): void {
   ctx.logger.info("git-panel activated");
+
+  const client = createGitClient(ctx);
+  setGitClient(client);
+  ctx.subscribe({ dispose: () => setGitClient(null) });
+  ctx.subscribe(ctx.providedServices.publish("git", client));
 
   let root: Root | null = null;
 
