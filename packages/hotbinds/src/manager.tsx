@@ -676,8 +676,14 @@ function Manager({
       if (key !== 'bindings') return
       const next = (ctx.settings.get<Binding[]>('bindings') ?? []) as Binding[]
       setItems((prev) => {
-        // If the data is identical, don't blow away local edits
+        // If incoming matches our local state, no-op.
         if (JSON.stringify(prev) === JSON.stringify(next)) return prev
+        // If incoming matches our locally-cleaned form, this change came from
+        // our own autosave — keep local (preserves in-progress empty rows).
+        const cleaned = prev
+          .map((b) => ({ ...b, name: b.name.trim(), key: b.key.trim(), text: b.text }))
+          .filter((b) => b.key.length > 0)
+        if (JSON.stringify(cleaned) === JSON.stringify(next)) return prev
         return next.map((b) => ({ ...b }))
       })
     })
