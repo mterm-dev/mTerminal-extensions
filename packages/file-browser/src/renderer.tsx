@@ -443,7 +443,8 @@ export function activate(ctx: ExtCtx): void {
       title: 'File Browser: Open in active group',
       run: async () => {
         const groupId = ctx.workspace.activeGroup()
-        const cwd = ctx.workspace.cwd() ?? undefined
+        const savedCwd = ctx.settings.get<string>('lastCwd')
+        const cwd = savedCwd ?? ctx.workspace.cwd() ?? undefined
         await ctx.tabs.open({
           type: 'file-browser',
           title: 'files',

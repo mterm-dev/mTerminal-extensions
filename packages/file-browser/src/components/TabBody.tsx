@@ -20,6 +20,10 @@ interface ExtCtx {
   events: { on(event: string, cb: (payload: unknown) => void): { dispose(): void } }
   workspace: { cwd(): string | null }
   tabs: { close(tabId: number): void }
+  settings: {
+    get<T = unknown>(key: string): T | undefined
+    set(key: string, value: unknown): void | Promise<void>
+  }
 }
 
 interface InitialProps {
@@ -53,11 +57,24 @@ export function TabBody({ ctx, tabId, initial }: Props): React.JSX.Element {
     [ipc, ctx.ui, ctx.terminal],
   )
 
-  const [state, setState] = useState<FileBrowserState>(() => ({
-    ...DEFAULT_BROWSER_STATE,
-    backend: initialBackend,
-    cwd: initialBackend.kind === 'local' ? initial.initialCwd ?? null : null,
-  }))
+  const [state, setState] = useState<FileBrowserState>(() => {
+    const savedCwd =
+      initialBackend.kind === 'local' ? ctx.settings.get<string>('lastCwd') : undefined
+    return {
+      ...DEFAULT_BROWSER_STATE,
+      backend: initialBackend,
+      cwd:
+        initialBackend.kind === 'local'
+          ? initial.initialCwd ?? savedCwd ?? null
+          : null,
+    }
+  })
+
+  useEffect(() => {
+    if (state.backend?.kind !== 'local') return
+    if (!state.cwd) return
+    void ctx.settings.set('lastCwd', state.cwd)
+  }, [ctx.settings, state.backend, state.cwd])
 
   useEffect(() => {
     if (state.cwd) return
