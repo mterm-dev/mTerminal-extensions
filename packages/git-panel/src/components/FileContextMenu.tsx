@@ -11,9 +11,10 @@ interface Props {
   state: FileMenuState;
   onClose: () => void;
   onRollback: (f: GitFile) => void;
+  onDelete: (f: GitFile) => void;
 }
 
-export function FileContextMenu({ state, onClose, onRollback }: Props) {
+export function FileContextMenu({ state, onClose, onRollback, onDelete }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -40,7 +41,7 @@ export function FileContextMenu({ state, onClose, onRollback }: Props) {
   const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
   const vh = typeof window !== "undefined" ? window.innerHeight : 768;
   const W = 200;
-  const H = 80;
+  const H = 120;
   const left = Math.min(state.x, vw - W - 4);
   const top = Math.min(state.y, vh - H - 4);
 
@@ -95,6 +96,35 @@ export function FileContextMenu({ state, onClose, onRollback }: Props) {
         {state.file.untracked
           ? "Rollback (delete untracked file)"
           : "Rollback (discard local changes)"}
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        className="git-file-ctxmenu-item"
+        onClick={() => {
+          onDelete(state.file);
+          onClose();
+        }}
+        style={{
+          display: "block",
+          width: "100%",
+          textAlign: "left",
+          padding: "6px 10px",
+          background: "transparent",
+          color: "var(--c-danger, #e05c5c)",
+          border: 0,
+          borderRadius: 4,
+          cursor: "pointer",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background =
+            "var(--c-bg-3, #2a2e36)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+        }}
+      >
+        Delete file
       </button>
     </div>
   );
