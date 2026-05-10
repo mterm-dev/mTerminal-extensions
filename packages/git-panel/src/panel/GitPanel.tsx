@@ -245,7 +245,7 @@ export function GitPanel({
             "host does not implement mt.git.discardPaths — update mTerminal to enable per-file rollback",
           );
         }
-        await api.discardPaths(cwd, [toPathspec(f.path)]);
+        await api.discardPaths(cwd, [f.path]);
       });
       setPathsChecked([f.path], false);
       setActionInfo(`rolled back ${f.path}`);
