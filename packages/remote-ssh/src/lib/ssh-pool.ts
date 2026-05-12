@@ -6,23 +6,32 @@ import type { SftpAuthBundle } from '../shared/types'
 export interface PoolEntry {
   client: Client
   sftp: SFTPWrapper | null
+  sftpOpening: Promise<SFTPWrapper> | null
   ready: boolean
   lastUsedMs: number
   lastError: string | null
   connectingPromise: Promise<void> | null
   shellSessions: Set<string>
+  sftpRefs: Set<string>
+  lastAuth: SftpAuthBundle | null
 }
 
 export interface PoolConfig {
   idleTimeoutMs: number
   keepaliveIntervalMs: number
   readyTimeoutMs: number
+  sftpOpenTimeoutMs: number
+}
+
+export interface PoolEventSink {
+  onDisconnected?(hostId: string, reason: string | null): void
 }
 
 const DEFAULT_CONFIG: PoolConfig = {
   idleTimeoutMs: 300_000,
   keepaliveIntervalMs: 30_000,
   readyTimeoutMs: 10_000,
+  sftpOpenTimeoutMs: 15_000,
 }
 
 export class SshPool {
@@ -30,6 +39,11 @@ export class SshPool {
   private gcTimer: NodeJS.Timeout | null = null
   private config: PoolConfig = { ...DEFAULT_CONFIG }
   private clientFactory: () => Client = () => new Client()
+  private sink: PoolEventSink = {}
+
+  setEventSink(sink: PoolEventSink): void {
+    this.sink = sink
+  }
 
   setConfig(partial: Partial<PoolConfig>): void {
     this.config = { ...this.config, ...partial }
@@ -82,11 +96,14 @@ export class SshPool {
     const entry: PoolEntry = {
       client: null as unknown as Client,
       sftp: null,
+      sftpOpening: null,
       ready: false,
       lastUsedMs: Date.now(),
       lastError: null,
       connectingPromise: null,
       shellSessions: new Set(),
+      sftpRefs: new Set(),
+      lastAuth: auth,
     }
     this.entries.set(auth.hostId, entry)
 
@@ -110,27 +127,34 @@ export class SshPool {
       const settle = (err: Error | null): void => {
         if (settled) return
         settled = true
+        client.removeListener('ready', onReady)
+        client.removeListener('error', onError)
         if (err) reject(err)
         else resolve()
       }
-      client.once('ready', () => {
+      const onReady = (): void => {
         entry.ready = true
         entry.lastUsedMs = Date.now()
         settle(null)
-      })
-      client.once('error', (err) => {
+      }
+      const onError = (err: Error): void => {
         entry.lastError = err.message
+        const wasReady = entry.ready
+        entry.ready = false
         this.entries.delete(auth.hostId)
         settle(makeError('EHOSTAUTH', err.message))
-      })
-      client.once('end', () => {
+        if (wasReady) this.notifyDisconnected(auth.hostId, err.message)
+      }
+      const onTerminate = (label: 'end' | 'close') => (): void => {
+        const wasReady = entry.ready
         entry.ready = false
         this.entries.delete(auth.hostId)
-      })
-      client.once('close', () => {
-        entry.ready = false
-        this.entries.delete(auth.hostId)
-      })
+        if (wasReady) this.notifyDisconnected(auth.hostId, label)
+      }
+      client.once('ready', onReady)
+      client.once('error', onError)
+      client.once('end', onTerminate('end'))
+      client.once('close', onTerminate('close'))
       try {
         client.connect(cfg)
       } catch (err) {
@@ -140,13 +164,26 @@ export class SshPool {
     })
   }
 
+  private notifyDisconnected(hostId: string, reason: string | null): void {
+    try {
+      this.sink.onDisconnected?.(hostId, reason)
+    } catch {
+      // ignore sink errors
+    }
+  }
+
   async withSftp<T>(hostId: string, fn: (sftp: SFTPWrapper) => Promise<T>): Promise<T> {
     const entry = this.entries.get(hostId)
     if (!entry || !entry.ready) {
       throw makeError('EHOSTLOST', `not connected to ${hostId}`)
     }
     if (!entry.sftp) {
-      entry.sftp = await this.openSftp(entry)
+      if (!entry.sftpOpening) {
+        entry.sftpOpening = this.openSftp(entry).finally(() => {
+          entry.sftpOpening = null
+        })
+      }
+      entry.sftp = await entry.sftpOpening
     }
     entry.lastUsedMs = Date.now()
     try {
@@ -163,8 +200,19 @@ export class SshPool {
   }
 
   private openSftp(entry: PoolEntry): Promise<SFTPWrapper> {
-    return new Promise((resolve, reject) => {
+    const timeoutMs = this.config.sftpOpenTimeoutMs
+    return new Promise<SFTPWrapper>((resolve, reject) => {
+      let settled = false
+      const timer = setTimeout(() => {
+        if (settled) return
+        settled = true
+        entry.lastError = 'sftp open timeout'
+        reject(makeError('EHOSTLOST', `sftp open timeout after ${timeoutMs}ms`))
+      }, timeoutMs)
       entry.client.sftp((err, sftp) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
         if (err) {
           entry.lastError = err.message
           reject(makeError('EHOSTLOST', err.message))
@@ -217,15 +265,54 @@ export class SshPool {
     e.lastUsedMs = Date.now()
   }
 
+  registerSftpUse(hostId: string, refId: string): void {
+    const e = this.entries.get(hostId)
+    if (!e) return
+    e.sftpRefs.add(refId)
+    e.lastUsedMs = Date.now()
+  }
+
+  unregisterSftpUse(hostId: string, refId: string): void {
+    const e = this.entries.get(hostId)
+    if (!e) return
+    e.sftpRefs.delete(refId)
+    e.lastUsedMs = Date.now()
+  }
+
+  touch(hostId: string): void {
+    const e = this.entries.get(hostId)
+    if (!e) return
+    e.lastUsedMs = Date.now()
+  }
+
+  async ensureReady(hostId: string): Promise<boolean> {
+    const existing = this.entries.get(hostId)
+    if (existing?.ready) {
+      existing.lastUsedMs = Date.now()
+      return true
+    }
+    const auth = existing?.lastAuth ?? null
+    if (!auth) return false
+    try {
+      await this.ensureConnected(auth)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   disconnect(hostId: string): void {
     const entry = this.entries.get(hostId)
     if (!entry) return
+    const wasReady = entry.ready
+    entry.ready = false
     try {
       entry.client.end()
     } catch {
       // ignore
     }
     this.entries.delete(hostId)
+    if (wasReady) this.notifyDisconnected(hostId, 'disconnect')
   }
 
   disconnectAll(): void {
@@ -238,6 +325,7 @@ export class SshPool {
     const now = Date.now()
     for (const [hostId, entry] of this.entries) {
       if (entry.shellSessions.size > 0) continue
+      if (entry.sftpRefs.size > 0) continue
       if (now - entry.lastUsedMs > this.config.idleTimeoutMs) {
         this.disconnect(hostId)
       }

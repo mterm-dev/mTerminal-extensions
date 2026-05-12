@@ -86,10 +86,11 @@ interface Props {
   ctx: CtxBridge
   backend: FileBackend
   path: string
+  tabKey: string
   initialContent?: string
   initialOriginal?: string
-  onBufferChange?: (path: string, text: string, original: string) => void
-  onRequestClose: (path: string) => void
+  onBufferChange?: (tabKey: string, text: string, original: string) => void
+  onRequestClose: (tabKey: string) => void
 }
 
 export function basename(p: string, backend: FileBackend): string {
@@ -444,6 +445,7 @@ export function FileEditor({
   ctx,
   backend,
   path,
+  tabKey,
   initialContent,
   initialOriginal,
   onBufferChange,
@@ -476,14 +478,28 @@ export function FileEditor({
   const requestCloseRef = useRef<() => void>(() => {})
 
   useEffect(() => {
-    onBufferChangeRef.current?.(path, text, original)
-  }, [text, original, path])
+    onBufferChangeRef.current?.(tabKey, text, original)
+  }, [text, original, tabKey])
 
   const save = useCallback(async (): Promise<boolean> => {
     if (!dirtyRef.current) return true
     setSaving(true)
+    const attemptWrite = (): Promise<void> =>
+      ctx.ipc
+        .invoke(writeChannel(backend), writeArgs(backend, path, textRef.current))
+        .then(() => undefined)
     try {
-      await ctx.ipc.invoke(writeChannel(backend), writeArgs(backend, path, textRef.current))
+      try {
+        await attemptWrite()
+      } catch (err) {
+        const code = (err as { code?: string }).code
+        if (backend.kind === 'sftp' && code === 'EHOSTLOST') {
+          await ctx.ipc.invoke('sftp:connect', { hostId: backend.hostId })
+          await attemptWrite()
+        } else {
+          throw err
+        }
+      }
       setOriginal(textRef.current)
       ctx.ui.toast({ kind: 'success', message: `saved ${fileName}` })
       return true
@@ -501,8 +517,8 @@ export function FileEditor({
   }, [backend, ctx, fileName, path])
 
   const requestClose = useCallback(() => {
-    onRequestCloseRef.current(path)
-  }, [path])
+    onRequestCloseRef.current(tabKey)
+  }, [tabKey])
 
   saveRef.current = save
   requestCloseRef.current = requestClose

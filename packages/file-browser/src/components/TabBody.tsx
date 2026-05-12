@@ -5,6 +5,7 @@ import { FileEditorTabs } from './FileEditorTabs'
 import { createFsIpc, type SftpServiceLike, type ServiceProxyLike } from '../lib/sftp-adapter'
 import {
   DEFAULT_BROWSER_STATE,
+  fileEditorTabKey,
   type FileBackend,
   type FileBrowserClipboard,
   type FileBrowserState,
@@ -146,15 +147,15 @@ export function TabBody({ ctx, tabId, initial }: Props): React.JSX.Element {
   dirtyMapRef.current = dirtyMap
 
   const handleBufferChange = useCallback(
-    (path: string, text: string, original: string) => {
-      buffersRef.current.set(path, { text, original })
+    (key: string, text: string, original: string) => {
+      buffersRef.current.set(key, { text, original })
       const isDirty = text !== original
       setDirtyMap((prev) => {
-        const wasDirty = Boolean(prev[path])
+        const wasDirty = Boolean(prev[key])
         if (wasDirty === isDirty) return prev
         const next = { ...prev }
-        if (isDirty) next[path] = true
-        else delete next[path]
+        if (isDirty) next[key] = true
+        else delete next[key]
         return next
       })
     },
@@ -163,25 +164,26 @@ export function TabBody({ ctx, tabId, initial }: Props): React.JSX.Element {
 
   const onOpenEditor = useCallback((path: string, backend: FileBackend) => {
     setState((s) => {
-      const exists = s.editorTabs.some((t) => t.path === path)
+      const key = fileEditorTabKey({ path, backend })
+      const exists = s.editorTabs.some((t) => fileEditorTabKey(t) === key)
       if (exists) {
-        return s.activeEditorPath === path ? s : { ...s, activeEditorPath: path }
+        return s.activeEditorKey === key ? s : { ...s, activeEditorKey: key }
       }
       return {
         ...s,
         editorTabs: [...s.editorTabs, { path, backend }],
-        activeEditorPath: path,
+        activeEditorKey: key,
       }
     })
   }, [])
 
-  const onSelectTab = useCallback((path: string) => {
-    setState((s) => (s.activeEditorPath === path ? s : { ...s, activeEditorPath: path }))
+  const onSelectTab = useCallback((key: string) => {
+    setState((s) => (s.activeEditorKey === key ? s : { ...s, activeEditorKey: key }))
   }, [])
 
   const onCloseTab = useCallback(
-    async (path: string): Promise<void> => {
-      if (dirtyMapRef.current[path]) {
+    async (key: string): Promise<void> => {
+      if (dirtyMapRef.current[key]) {
         const ok = await ctx.ui.confirm({
           title: 'unsaved changes',
           message: 'discard changes?',
@@ -191,23 +193,34 @@ export function TabBody({ ctx, tabId, initial }: Props): React.JSX.Element {
         })
         if (!ok) return
       }
-      buffersRef.current.delete(path)
+      buffersRef.current.delete(key)
       setDirtyMap((prev) => {
-        if (!(path in prev)) return prev
+        if (!(key in prev)) return prev
         const next = { ...prev }
-        delete next[path]
+        delete next[key]
         return next
       })
+      let becameEmpty = false
       setState((s) => {
-        const idx = s.editorTabs.findIndex((t) => t.path === path)
+        const idx = s.editorTabs.findIndex((t) => fileEditorTabKey(t) === key)
         if (idx < 0) return s
         const nextTabs = s.editorTabs.filter((_, i) => i !== idx)
-        let nextActive = s.activeEditorPath
-        if (s.activeEditorPath === path) {
-          nextActive = nextTabs[idx]?.path ?? nextTabs[idx - 1]?.path ?? null
+        let nextActive = s.activeEditorKey
+        if (s.activeEditorKey === key) {
+          const fallback = nextTabs[idx] ?? nextTabs[idx - 1] ?? null
+          nextActive = fallback ? fileEditorTabKey(fallback) : null
         }
-        return { ...s, editorTabs: nextTabs, activeEditorPath: nextActive }
+        if (nextTabs.length === 0) becameEmpty = true
+        return { ...s, editorTabs: nextTabs, activeEditorKey: nextActive }
       })
+      if (becameEmpty && splitRef.current) {
+        requestAnimationFrame(() => {
+          const target = splitRef.current?.querySelector<HTMLElement>(
+            '.fb-tree [tabindex="0"], .fb-tree button, .fb-pane',
+          )
+          target?.focus()
+        })
+      }
     },
     [ctx.ui],
   )
@@ -221,8 +234,9 @@ export function TabBody({ ctx, tabId, initial }: Props): React.JSX.Element {
         (t) => t.backend.kind === 'sftp' && t.backend.hostId === hostId,
       )
       if (affected.length === 0) return
-      const dirtyCount = affected.reduce(
-        (n, t) => n + (dirtyMapRef.current[t.path] ? 1 : 0),
+      const affectedKeys = affected.map((t) => fileEditorTabKey(t))
+      const dirtyCount = affectedKeys.reduce(
+        (n, k) => n + (dirtyMapRef.current[k] ? 1 : 0),
         0,
       )
       if (dirtyCount > 0) {
@@ -235,13 +249,13 @@ export function TabBody({ ctx, tabId, initial }: Props): React.JSX.Element {
         })
         if (!ok) return
       }
-      for (const t of affected) buffersRef.current.delete(t.path)
+      for (const k of affectedKeys) buffersRef.current.delete(k)
       setDirtyMap((prev) => {
         let mutated = false
         const next = { ...prev }
-        for (const t of affected) {
-          if (t.path in next) {
-            delete next[t.path]
+        for (const k of affectedKeys) {
+          if (k in next) {
+            delete next[k]
             mutated = true
           }
         }
@@ -251,11 +265,17 @@ export function TabBody({ ctx, tabId, initial }: Props): React.JSX.Element {
         const nextTabs = s.editorTabs.filter(
           (t) => !(t.backend.kind === 'sftp' && t.backend.hostId === hostId),
         )
-        const stillActive = nextTabs.some((t) => t.path === s.activeEditorPath)
+        const stillActive = nextTabs.some(
+          (t) => fileEditorTabKey(t) === s.activeEditorKey,
+        )
         return {
           ...s,
           editorTabs: nextTabs,
-          activeEditorPath: stillActive ? s.activeEditorPath : nextTabs[0]?.path ?? null,
+          activeEditorKey: stillActive
+            ? s.activeEditorKey
+            : nextTabs[0]
+              ? fileEditorTabKey(nextTabs[0])
+              : null,
         }
       })
       ctx.ui.toast({
@@ -302,15 +322,18 @@ export function TabBody({ ctx, tabId, initial }: Props): React.JSX.Element {
 
   const hasTabs = state.editorTabs.length > 0
   const activeTab = useMemo(
-    () => state.editorTabs.find((t) => t.path === state.activeEditorPath) ?? null,
-    [state.editorTabs, state.activeEditorPath],
+    () =>
+      state.editorTabs.find((t) => fileEditorTabKey(t) === state.activeEditorKey) ??
+      null,
+    [state.editorTabs, state.activeEditorKey],
   )
+  const activeTabKey = activeTab ? fileEditorTabKey(activeTab) : null
 
   const treeStyle: React.CSSProperties | undefined = hasTabs
     ? { width: localTreeWidth ?? state.treeWidth, flex: 'none' }
     : undefined
 
-  const activeBuffer = activeTab ? buffersRef.current.get(activeTab.path) : undefined
+  const activeBuffer = activeTabKey ? buffersRef.current.get(activeTabKey) : undefined
 
   return (
     <div
@@ -340,21 +363,22 @@ export function TabBody({ ctx, tabId, initial }: Props): React.JSX.Element {
           <div className="fb-editor-side">
             <FileEditorTabs
               tabs={state.editorTabs}
-              activePath={state.activeEditorPath}
+              activeKey={state.activeEditorKey}
               dirtyMap={dirtyMap}
               onSelect={onSelectTab}
-              onClose={(p) => void onCloseTab(p)}
+              onClose={(k) => void onCloseTab(k)}
             />
-            {activeTab && (
+            {activeTab && activeTabKey && (
               <FileEditor
-                key={activeTab.path}
+                key={activeTabKey}
+                tabKey={activeTabKey}
                 ctx={bridge}
                 backend={activeTab.backend}
                 path={activeTab.path}
                 initialContent={activeBuffer?.text}
                 initialOriginal={activeBuffer?.original}
                 onBufferChange={handleBufferChange}
-                onRequestClose={(p) => void onCloseTab(p)}
+                onRequestClose={(k) => void onCloseTab(k)}
               />
             )}
           </div>

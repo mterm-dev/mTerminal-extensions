@@ -23,6 +23,11 @@ export interface SftpServiceLike {
   download(args: { hostId: string; remotePath: string; localPath: string }): Promise<void>
   read(args: { hostId: string; path: string }): Promise<{ content: string; truncated: boolean; size: number }>
   write(args: { hostId: string; path: string; content: string }): Promise<void>
+  registerUse?(args: { hostId: string; refId: string }): Promise<void>
+  unregisterUse?(args: { hostId: string; refId: string }): Promise<void>
+  onDisconnected?(
+    cb: (payload: { hostId: string; reason: string | null }) => void,
+  ): { dispose(): void }
 }
 
 export interface ServiceProxyLike<T> {
@@ -48,6 +53,8 @@ const CHANNEL_TO_METHOD: Record<string, keyof SftpServiceLike> = {
   'sftp:download': 'download',
   'sftp:read': 'read',
   'sftp:write': 'write',
+  'sftp:register-use': 'registerUse',
+  'sftp:unregister-use': 'unregisterUse',
 }
 
 export function createFsIpc(

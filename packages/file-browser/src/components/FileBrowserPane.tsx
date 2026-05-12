@@ -102,21 +102,35 @@ export function FileBrowserPane(props: PaneProps): React.JSX.Element {
       return
     }
     let cancelled = false
+    const hostId = backend.hostId
+    const refId = `fb:${Math.random().toString(36).slice(2)}`
     const check = async (): Promise<void> => {
       try {
         const r = await ctx.ipc.invoke<{ connected: boolean }>('sftp:status', {
-          hostId: backend.hostId,
+          hostId,
         })
         if (!cancelled) setSftpStatus(r.connected ? 'connected' : 'disconnected')
       } catch {
         if (!cancelled) setSftpStatus('disconnected')
       }
     }
+    void ctx.ipc
+      .invoke('sftp:register-use', { hostId, refId })
+      .catch(() => {})
     void check()
-    const id = setInterval(check, 5000)
+    const fallback = setInterval(check, 30_000)
+    const onDisc = ctx.ipc.on?.('sftp:disconnected', (payload) => {
+      const p = payload as { hostId: string } | null
+      if (p?.hostId !== hostId) return
+      if (!cancelled) setSftpStatus('disconnected')
+    })
     return () => {
       cancelled = true
-      clearInterval(id)
+      clearInterval(fallback)
+      onDisc?.dispose()
+      void ctx.ipc
+        .invoke('sftp:unregister-use', { hostId, refId })
+        .catch(() => {})
     }
   }, [backend, ctx.ipc])
 

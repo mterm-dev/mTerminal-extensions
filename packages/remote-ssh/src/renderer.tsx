@@ -5,7 +5,7 @@ import { HostEditorModal } from './components/HostEditorModal'
 import { RemoteTerminalTab } from './terminal/RemoteTerminalTab'
 import { mountSettings } from './settings'
 import { useHostRegistry, type ExtIpcLite } from './hooks/useHostRegistry'
-import { GROUP_ACCENTS } from './shared/types'
+import { GROUP_ACCENTS, emptyHost } from './shared/types'
 import type {
   HostGroup,
   HostMeta,
@@ -76,6 +76,13 @@ interface ExtCtx {
       cancelLabel?: string
       danger?: boolean
     }): Promise<boolean>
+    prompt(opts: {
+      title: string
+      message?: string
+      placeholder?: string
+      defaultValue?: string
+      password?: boolean
+    }): Promise<string | undefined>
   }
   secrets: {
     get(key: string): Promise<string | null>
@@ -476,45 +483,77 @@ function PanelHarness({ ctx }: PanelHarnessProps): React.JSX.Element {
     [ctx, reg],
   )
 
+  const reportError = React.useCallback(
+    (title: string, err: unknown): void => {
+      ctx.ui.toast({
+        kind: 'error',
+        title,
+        message: (err as Error).message ?? String(err),
+        details: (err as Error).stack,
+      })
+    },
+    [ctx],
+  )
+
   const onAddGroup = React.useCallback(async () => {
-    const accent = GROUP_ACCENTS[reg.groups.length % GROUP_ACCENTS.length]
-    await reg.saveGroup({
-      name: `group ${reg.groups.length + 1}`,
-      collapsed: false,
-      accent,
-    })
-  }, [reg])
+    try {
+      const accent = GROUP_ACCENTS[reg.groups.length % GROUP_ACCENTS.length]
+      await reg.saveGroup({
+        name: `group ${reg.groups.length + 1}`,
+        collapsed: false,
+        accent,
+      })
+    } catch (err) {
+      reportError('add group failed', err)
+    }
+  }, [reg, reportError])
 
   const onRenameHost = React.useCallback(
     async (host: HostMeta, name: string) => {
       const trimmed = name.trim()
       if (!trimmed || trimmed === host.name) return
-      await reg.saveHost({ ...host, name: trimmed })
+      try {
+        await reg.saveHost({ ...host, name: trimmed })
+      } catch (err) {
+        reportError('rename host failed', err)
+      }
     },
-    [reg],
+    [reg, reportError],
   )
 
   const onRenameGroup = React.useCallback(
     async (group: HostGroup, name: string) => {
       const trimmed = name.trim()
       if (!trimmed || trimmed === group.name) return
-      await reg.saveGroup({ ...group, name: trimmed })
+      try {
+        await reg.saveGroup({ ...group, name: trimmed })
+      } catch (err) {
+        reportError('rename group failed', err)
+      }
     },
-    [reg],
+    [reg, reportError],
   )
 
   const onToggleGroup = React.useCallback(
     async (group: HostGroup) => {
-      await reg.saveGroup({ ...group, collapsed: !group.collapsed })
+      try {
+        await reg.saveGroup({ ...group, collapsed: !group.collapsed })
+      } catch (err) {
+        reportError('group update failed', err)
+      }
     },
-    [reg],
+    [reg, reportError],
   )
 
   const onSetGroupAccent = React.useCallback(
     async (group: HostGroup, accent: string) => {
-      await reg.saveGroup({ ...group, accent })
+      try {
+        await reg.saveGroup({ ...group, accent })
+      } catch (err) {
+        reportError('group accent failed', err)
+      }
     },
-    [reg],
+    [reg, reportError],
   )
 
   const onDeleteGroup = React.useCallback(
@@ -554,12 +593,16 @@ function PanelHarness({ ctx }: PanelHarnessProps): React.JSX.Element {
         onGroupContextMenu={(group, x, y) =>
           setMenu({ kind: 'group', x, y, group })
         }
-        onReorderHost={(hostId, beforeHostId, groupId) =>
-          void reg.reorderHost(hostId, beforeHostId, groupId)
-        }
-        onReorderGroup={(groupId, beforeGroupId) =>
-          void reg.reorderGroup(groupId, beforeGroupId)
-        }
+        onReorderHost={(hostId, beforeHostId, groupId) => {
+          void reg
+            .reorderHost(hostId, beforeHostId, groupId)
+            .catch((err) => reportError('reorder host failed', err))
+        }}
+        onReorderGroup={(groupId, beforeGroupId) => {
+          void reg
+            .reorderGroup(groupId, beforeGroupId)
+            .catch((err) => reportError('reorder group failed', err))
+        }}
       />
 
       {menu?.kind === 'host' && (
@@ -580,7 +623,11 @@ function PanelHarness({ ctx }: PanelHarnessProps): React.JSX.Element {
           onDelete={() => {
             void onDeleteHost(menu.host)
           }}
-          onMoveToGroup={(gid) => void reg.setHostGroup(menu.host.id, gid)}
+          onMoveToGroup={(gid) => {
+            void reg
+              .setHostGroup(menu.host.id, gid)
+              .catch((err) => reportError('move to group failed', err))
+          }}
         />
       )}
 
@@ -605,9 +652,7 @@ function PanelHarness({ ctx }: PanelHarnessProps): React.JSX.Element {
           secrets={ctx.secrets}
           ui={ctx.ui}
           onClose={() => setEditor(null)}
-          onSave={async (host) => {
-            await reg.saveHost(host)
-          }}
+          onSave={(host) => reg.saveHost(host)}
         />
       )}
     </>
@@ -774,19 +819,8 @@ function Submenu({
   )
 }
 
-function emptyHost(): HostMeta {
-  return {
-    id: '',
-    name: '',
-    host: '',
-    port: 22,
-    user: '',
-    auth: 'key',
-    identityPath: undefined,
-    savePassword: false,
-    groupId: null,
-  }
-}
+
+const sessionPasswordCache = new Map<string, string>()
 
 async function buildAuthBundle(
   ctx: ExtCtx,
@@ -806,9 +840,24 @@ async function buildAuthBundle(
     if (!host.identityPath) throw new Error('host has no identity path')
     bundle.identityPath = host.identityPath
   } else if (host.auth === 'password') {
-    if (!host.savePassword) throw new Error('host requires savePassword=true')
-    const pwd = await ctx.secrets.get(`host:${host.id}`)
-    if (!pwd) throw new Error('no saved password (open editor and set one)')
+    let pwd: string | null | undefined
+    if (host.savePassword) {
+      pwd = await ctx.secrets.get(`host:${host.id}`)
+    }
+    if (!pwd) {
+      pwd = sessionPasswordCache.get(host.id) ?? null
+    }
+    if (!pwd) {
+      const entered = await ctx.ui.prompt({
+        title: `password for ${host.user}@${host.host}`,
+        message: 'not stored — entered passwords are kept in memory for this session only',
+        placeholder: 'password',
+        password: true,
+      })
+      if (!entered) throw new Error('password required')
+      sessionPasswordCache.set(host.id, entered)
+      pwd = entered
+    }
     bundle.password = pwd
   }
   return bundle
@@ -978,6 +1027,18 @@ function publishRendererServices(ctx: ExtCtx): void {
     read: (args: { hostId: string; path: string }) => ctx.ipc.invoke('sftp:read', args),
     write: (args: { hostId: string; path: string; content: string }) =>
       ctx.ipc.invoke('sftp:write', args),
+    registerUse: (args: { hostId: string; refId: string }) =>
+      ctx.ipc.invoke('sftp:register-use', args) as Promise<void>,
+    unregisterUse: (args: { hostId: string; refId: string }) =>
+      ctx.ipc.invoke('sftp:unregister-use', args) as Promise<void>,
+    onDisconnected: (
+      cb: (payload: { hostId: string; reason: string | null }) => void,
+    ): { dispose(): void } => {
+      const sub = ctx.ipc.on('sftp:disconnected', (payload) => {
+        cb(payload as { hostId: string; reason: string | null })
+      })
+      return { dispose: () => sub.dispose() }
+    },
   }
   ctx.subscribe(ctx.providedServices.publish('sftp-fs', sftpFs))
 }

@@ -218,19 +218,22 @@ export function RemoteSshPanel(props: Props): React.JSX.Element {
     const groupMark = groupDropMarkRef.current
     e.preventDefault()
     e.stopPropagation()
-    if (drag != null && mark) {
-      if (mark.kind === 'before') {
-        onReorderHost(drag, mark.beforeId, mark.groupId)
-      } else {
-        onReorderHost(drag, null, mark.groupId)
+    try {
+      if (drag != null && mark) {
+        if (mark.kind === 'before') {
+          onReorderHost(drag, mark.beforeId, mark.groupId)
+        } else {
+          onReorderHost(drag, null, mark.groupId)
+        }
+      } else if (groupDrag != null && groupMark) {
+        onReorderGroup(
+          groupDrag,
+          groupMark.kind === 'before' ? groupMark.beforeId : null,
+        )
       }
-    } else if (groupDrag != null && groupMark) {
-      onReorderGroup(
-        groupDrag,
-        groupMark.kind === 'before' ? groupMark.beforeId : null,
-      )
+    } finally {
+      resetDrag()
     }
-    resetDrag()
   }
 
   const renderHost = (h: HostMeta, sectionHosts: HostMeta[]): React.JSX.Element => {

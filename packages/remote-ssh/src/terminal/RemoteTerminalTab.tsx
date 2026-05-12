@@ -77,6 +77,8 @@ export class RemoteTerminalTab {
   private currentCopyOnSelect = false
   private disposed = false
   private mounted = false
+  private awaitingReconnect = false
+  private connecting = false
 
   constructor(
     private deps: RemoteTerminalDeps,
@@ -132,7 +134,15 @@ export class RemoteTerminalTab {
     }
 
     term.onData((data) => {
-      if (!this.sessionId || this.disposed) return
+      if (this.disposed) return
+      if (this.awaitingReconnect) {
+        if (data === '\r' || data === '\n') {
+          this.awaitingReconnect = false
+          void this.startSession()
+        }
+        return
+      }
+      if (!this.sessionId) return
       void this.deps.ipc.invoke('shell:write', { sessionId: this.sessionId, data })
     })
 
@@ -144,6 +154,14 @@ export class RemoteTerminalTab {
     this.resizeObserver = new ResizeObserver(() => this.scheduleFit())
     this.resizeObserver.observe(host)
 
+    await this.startSession()
+  }
+
+  private async startSession(): Promise<void> {
+    const term = this.term
+    const fit = this.fit
+    if (!term || !fit || this.disposed || this.connecting) return
+    this.connecting = true
     try {
       const auth = await this.deps.resolveAuth(this.tabProps.hostId)
       const initial = fit.proposeDimensions() ?? { rows: term.rows, cols: term.cols }
@@ -159,16 +177,43 @@ export class RemoteTerminalTab {
       if (result.banner) {
         term.write(`\x1b[2m${result.banner}\x1b[0m\r\n`)
       }
+      this.dataSub?.dispose()
+      this.exitSub?.dispose()
       this.dataSub = this.deps.ipc.on(`shell:data:${result.sessionId}`, (chunk) => {
         if (typeof chunk === 'string') term.write(chunk)
       })
       this.exitSub = this.deps.ipc.on(`shell:exit:${result.sessionId}`, () => {
-        term.write('\r\n\x1b[2m[connection closed]\x1b[0m\r\n')
+        this.handleSessionExit()
       })
     } catch (err) {
-      term.write(`\r\n\x1b[31m${(err as Error).message ?? String(err)}\x1b[0m\r\n`)
+      const code = (err as { code?: string }).code
+      const msg = (err as Error).message ?? String(err)
+      const hint =
+        code === 'EHOSTAUTH'
+          ? ' (check key / agent / password)'
+          : code === 'EHOSTLOST'
+            ? ' (host unreachable)'
+            : ''
+      term.write(`\r\n\x1b[31m${msg}${hint}\x1b[0m\r\n`)
+      term.write('\x1b[2m[press Enter to reconnect]\x1b[0m\r\n')
+      this.sessionId = null
+      this.awaitingReconnect = true
       this.deps.logger?.error?.('shell spawn failed', err)
+    } finally {
+      this.connecting = false
     }
+  }
+
+  private handleSessionExit(): void {
+    const term = this.term
+    if (!term || this.disposed) return
+    this.sessionId = null
+    this.dataSub?.dispose()
+    this.exitSub?.dispose()
+    this.dataSub = null
+    this.exitSub = null
+    term.write('\r\n\x1b[2m[connection closed — press Enter to reconnect]\x1b[0m\r\n')
+    this.awaitingReconnect = true
   }
 
   unmount(): void {

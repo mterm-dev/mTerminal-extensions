@@ -56,6 +56,15 @@ export async function activate(ctx: MainCtx): Promise<void> {
     }),
   )
 
+  pool.setEventSink({
+    onDisconnected: (hostId, reason) => {
+      try {
+        ctx.ipc.emit('sftp:disconnected', { hostId, reason })
+      } catch {
+        // ignore
+      }
+    },
+  })
   pool.startGc()
   ctx.subscribe(() => pool.stopGc())
 
@@ -101,11 +110,13 @@ function applySettings(ctx: MainCtx, pool: SshPool, ops: SftpOps): void {
   const idleTimeoutSec = ctx.settings.get<number>('idleTimeoutSec') ?? 300
   const keepaliveSec = ctx.settings.get<number>('keepaliveIntervalSec') ?? 30
   const readyTimeoutMs = ctx.settings.get<number>('readyTimeoutMs') ?? 10_000
+  const sftpOpenTimeoutMs = ctx.settings.get<number>('sftpOpenTimeoutMs') ?? 15_000
   const maxEntriesPerDir = ctx.settings.get<number>('maxEntriesPerDir') ?? 5000
   pool.setConfig({
     idleTimeoutMs: Math.max(60, idleTimeoutSec) * 1000,
     keepaliveIntervalMs: Math.max(5, keepaliveSec) * 1000,
     readyTimeoutMs: Math.max(1000, readyTimeoutMs),
+    sftpOpenTimeoutMs: Math.max(1000, sftpOpenTimeoutMs),
   })
   ops.setConfig({ maxEntriesPerDir: Math.max(100, maxEntriesPerDir) })
 }
@@ -226,6 +237,7 @@ function registerShellHandlers(ctx: MainCtx, pool: SshPool, store: HostStore): v
       const args = a as { sessionId: string; rows: number; cols: number }
       const session = shells.get(args.sessionId)
       if (!session) return
+      pool.touch(session.hostId)
       try {
         session.stream.setWindow(args.rows, args.cols, 0, 0)
       } catch {
@@ -250,6 +262,18 @@ function registerShellHandlers(ctx: MainCtx, pool: SshPool, store: HostStore): v
 }
 
 function registerSftpHandlers(ctx: MainCtx, ops: SftpOps, pool: SshPool): void {
+  const ensure = async (hostId: string): Promise<void> => {
+    const ok = await pool.ensureReady(hostId)
+    if (!ok) throw makeError('EHOSTLOST', `not connected to ${hostId}`)
+  }
+  const guard = <A extends { hostId: string }, R>(
+    fn: (a: A) => Promise<R>,
+  ) => async (a: unknown): Promise<R> => {
+    const args = a as A
+    await ensure(args.hostId)
+    return fn(args)
+  }
+
   ctx.subscribe(
     ctx.ipc.handle('sftp:connect', async (a) => {
       const args = a as { auth: SftpAuthBundle }
@@ -266,20 +290,32 @@ function registerSftpHandlers(ctx: MainCtx, ops: SftpOps, pool: SshPool): void {
   ctx.subscribe(
     ctx.ipc.handle('sftp:status', (a) => pool.status((a as { hostId: string }).hostId)),
   )
-  ctx.subscribe(ctx.ipc.handle('sftp:list', (a) => ops.list(a as { hostId: string; cwd: string; showHidden: boolean })))
-  ctx.subscribe(ctx.ipc.handle('sftp:stat', (a) => ops.stat(a as { hostId: string; path: string })))
-  ctx.subscribe(ctx.ipc.handle('sftp:home', (a) => ops.home((a as { hostId: string }).hostId)))
-  ctx.subscribe(ctx.ipc.handle('sftp:realpath', (a) => ops.realpath(a as { hostId: string; path: string })))
-  ctx.subscribe(ctx.ipc.handle('sftp:mkdir', (a) => ops.mkdir(a as { hostId: string; path: string })))
-  ctx.subscribe(ctx.ipc.handle('sftp:create-file', (a) => ops.createFile(a as { hostId: string; path: string })))
-  ctx.subscribe(ctx.ipc.handle('sftp:rename', (a) => ops.rename(a as { hostId: string; from: string; to: string })))
-  ctx.subscribe(ctx.ipc.handle('sftp:remove', (a) => ops.remove(a as { hostId: string; path: string; recursive: boolean })))
-  ctx.subscribe(ctx.ipc.handle('sftp:copy', (a) => ops.copy(a as { hostId: string; from: string; to: string; recursive: boolean })))
-  ctx.subscribe(ctx.ipc.handle('sftp:move', (a) => ops.move(a as { hostId: string; from: string; to: string })))
-  ctx.subscribe(ctx.ipc.handle('sftp:upload', (a) => ops.upload(a as { hostId: string; localPath: string; remotePath: string })))
-  ctx.subscribe(ctx.ipc.handle('sftp:download', (a) => ops.download(a as { hostId: string; remotePath: string; localPath: string })))
-  ctx.subscribe(ctx.ipc.handle('sftp:read', (a) => ops.read(a as { hostId: string; path: string })))
-  ctx.subscribe(ctx.ipc.handle('sftp:write', (a) => ops.write(a as { hostId: string; path: string; content: string })))
+  ctx.subscribe(
+    ctx.ipc.handle('sftp:register-use', (a) => {
+      const args = a as { hostId: string; refId: string }
+      pool.registerSftpUse(args.hostId, args.refId)
+    }),
+  )
+  ctx.subscribe(
+    ctx.ipc.handle('sftp:unregister-use', (a) => {
+      const args = a as { hostId: string; refId: string }
+      pool.unregisterSftpUse(args.hostId, args.refId)
+    }),
+  )
+  ctx.subscribe(ctx.ipc.handle('sftp:list', guard((a: { hostId: string; cwd: string; showHidden: boolean }) => ops.list(a))))
+  ctx.subscribe(ctx.ipc.handle('sftp:stat', guard((a: { hostId: string; path: string }) => ops.stat(a))))
+  ctx.subscribe(ctx.ipc.handle('sftp:home', guard((a: { hostId: string }) => ops.home(a.hostId))))
+  ctx.subscribe(ctx.ipc.handle('sftp:realpath', guard((a: { hostId: string; path: string }) => ops.realpath(a))))
+  ctx.subscribe(ctx.ipc.handle('sftp:mkdir', guard((a: { hostId: string; path: string }) => ops.mkdir(a))))
+  ctx.subscribe(ctx.ipc.handle('sftp:create-file', guard((a: { hostId: string; path: string }) => ops.createFile(a))))
+  ctx.subscribe(ctx.ipc.handle('sftp:rename', guard((a: { hostId: string; from: string; to: string }) => ops.rename(a))))
+  ctx.subscribe(ctx.ipc.handle('sftp:remove', guard((a: { hostId: string; path: string; recursive: boolean }) => ops.remove(a))))
+  ctx.subscribe(ctx.ipc.handle('sftp:copy', guard((a: { hostId: string; from: string; to: string; recursive: boolean }) => ops.copy(a))))
+  ctx.subscribe(ctx.ipc.handle('sftp:move', guard((a: { hostId: string; from: string; to: string }) => ops.move(a))))
+  ctx.subscribe(ctx.ipc.handle('sftp:upload', guard((a: { hostId: string; localPath: string; remotePath: string }) => ops.upload(a))))
+  ctx.subscribe(ctx.ipc.handle('sftp:download', guard((a: { hostId: string; remotePath: string; localPath: string }) => ops.download(a))))
+  ctx.subscribe(ctx.ipc.handle('sftp:read', guard((a: { hostId: string; path: string }) => ops.read(a))))
+  ctx.subscribe(ctx.ipc.handle('sftp:write', guard((a: { hostId: string; path: string; content: string }) => ops.write(a))))
 }
 
 function publishMainServices(

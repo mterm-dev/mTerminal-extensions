@@ -104,3 +104,17 @@ export const GROUP_ACCENTS = [
 ] as const
 
 export type GroupAccent = (typeof GROUP_ACCENTS)[number]
+
+export function emptyHost(): HostMeta {
+  return {
+    id: '',
+    name: '',
+    host: '',
+    port: 22,
+    user: '',
+    auth: 'key',
+    identityPath: undefined,
+    savePassword: false,
+    groupId: null,
+  }
+}

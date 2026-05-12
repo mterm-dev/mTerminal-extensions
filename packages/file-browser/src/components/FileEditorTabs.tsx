@@ -1,26 +1,27 @@
 import React from 'react'
 import { basename } from './FileEditor'
 import { IconClose } from './icons'
-import type { FileEditorTab } from '../shared/types'
+import { fileEditorTabKey, type FileEditorTab } from '../shared/types'
 
 interface Props {
   tabs: FileEditorTab[]
-  activePath: string | null
+  activeKey: string | null
   dirtyMap: Record<string, boolean>
-  onSelect: (path: string) => void
-  onClose: (path: string) => void
+  onSelect: (key: string) => void
+  onClose: (key: string) => void
 }
 
-export function FileEditorTabs({ tabs, activePath, dirtyMap, onSelect, onClose }: Props): React.JSX.Element {
+export function FileEditorTabs({ tabs, activeKey, dirtyMap, onSelect, onClose }: Props): React.JSX.Element {
   return (
     <div className="fb-tabs" role="tablist">
       {tabs.map((tab) => {
-        const isActive = tab.path === activePath
-        const isDirty = Boolean(dirtyMap[tab.path])
+        const key = fileEditorTabKey(tab)
+        const isActive = key === activeKey
+        const isDirty = Boolean(dirtyMap[key])
         const name = basename(tab.path, tab.backend)
         return (
           <button
-            key={tab.path}
+            key={key}
             type="button"
             role="tab"
             aria-selected={isActive}
@@ -30,11 +31,11 @@ export function FileEditorTabs({ tabs, activePath, dirtyMap, onSelect, onClose }
               (isDirty ? ' fb-tab-dirty' : '')
             }
             title={tab.path}
-            onClick={() => onSelect(tab.path)}
+            onClick={() => onSelect(key)}
             onAuxClick={(e) => {
               if (e.button === 1) {
                 e.preventDefault()
-                onClose(tab.path)
+                onClose(key)
               }
             }}
           >
@@ -45,7 +46,7 @@ export function FileEditorTabs({ tabs, activePath, dirtyMap, onSelect, onClose }
               aria-label="close tab"
               onClick={(e) => {
                 e.stopPropagation()
-                onClose(tab.path)
+                onClose(key)
               }}
             >
               <IconClose />

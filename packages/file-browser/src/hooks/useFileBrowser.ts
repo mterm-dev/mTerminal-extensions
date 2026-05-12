@@ -63,6 +63,21 @@ export function useFileBrowser(args: Args): UseFileBrowserResult {
   const { ipc, backend, cwd, showHidden } = args
   const [tree, dispatch] = useReducer(reduceTree, EMPTY_TREE)
   const cwdRef = useRef<string | null>(null)
+  const sessionIdRef = useRef(0)
+  const backendKeyRef = useRef<string | null>(null)
+
+  const backendKey = backend
+    ? backend.kind === 'sftp'
+      ? `sftp:${backend.hostId}`
+      : 'local'
+    : null
+
+  useEffect(() => {
+    if (backendKeyRef.current !== backendKey) {
+      backendKeyRef.current = backendKey
+      sessionIdRef.current += 1
+    }
+  }, [backendKey])
 
   const callList = useCallback(
     async (target: string): Promise<FileListResult> => {
@@ -78,14 +93,15 @@ export function useFileBrowser(args: Args): UseFileBrowserResult {
   const refreshRoot = useCallback(async () => {
     if (!backend || !cwd) return
     cwdRef.current = cwd
+    const session = sessionIdRef.current
     dispatch({ type: 'set-root', rootPath: cwd } as TreeAction)
     dispatch({ type: 'load-root-start' } as TreeAction)
     try {
       const res = await callList(cwd)
-      if (cwdRef.current !== cwd) return
+      if (cwdRef.current !== cwd || sessionIdRef.current !== session) return
       dispatch({ type: 'set-entries', parentPath: null, entries: res.entries } as TreeAction)
     } catch (err) {
-      if (cwdRef.current !== cwd) return
+      if (cwdRef.current !== cwd || sessionIdRef.current !== session) return
       dispatch({ type: 'load-root-error', error: (err as Error).message } as TreeAction)
     }
   }, [backend, callList, cwd])
@@ -102,10 +118,13 @@ export function useFileBrowser(args: Args): UseFileBrowserResult {
       dispatch({ type: 'expand', path: p } as TreeAction)
       if (node.loaded || node.loading) return
       dispatch({ type: 'mark-loading', path: p, loading: true } as TreeAction)
+      const session = sessionIdRef.current
       try {
         const res = await callList(p)
+        if (sessionIdRef.current !== session) return
         dispatch({ type: 'set-entries', parentPath: p, entries: res.entries } as TreeAction)
       } catch (err) {
+        if (sessionIdRef.current !== session) return
         dispatch({ type: 'mark-error', path: p, error: (err as Error).message } as TreeAction)
       }
     },
@@ -131,12 +150,15 @@ export function useFileBrowser(args: Args): UseFileBrowserResult {
         await refreshRoot()
         return
       }
+      const session = sessionIdRef.current
       dispatch({ type: 'invalidate', path: p } as TreeAction)
       dispatch({ type: 'mark-loading', path: p, loading: true } as TreeAction)
       try {
         const res = await callList(p)
+        if (sessionIdRef.current !== session) return
         dispatch({ type: 'set-entries', parentPath: p, entries: res.entries } as TreeAction)
       } catch (err) {
+        if (sessionIdRef.current !== session) return
         dispatch({ type: 'mark-error', path: p, error: (err as Error).message } as TreeAction)
       }
     },

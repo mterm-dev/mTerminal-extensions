@@ -767,7 +767,14 @@ export interface UiApi {
     /** When true, the confirm button uses the danger style (red). */
     danger?: boolean
   }): Promise<boolean>
-  prompt(opts: { title: string; message?: string; placeholder?: string; defaultValue?: string }): Promise<string | undefined>
+  prompt(opts: {
+    title: string
+    message?: string
+    placeholder?: string
+    defaultValue?: string
+    /** When true, the input is rendered as a password field (chars masked). */
+    password?: boolean
+  }): Promise<string | undefined>
   toast(opts: {
     kind?: 'info' | 'success' | 'warn' | 'error'
     /** Optional bold heading shown above the message. */

@@ -135,6 +135,7 @@ export class HostStore {
     if (!host) return
     host.lastUsed = Math.floor(Date.now() / 1000)
     await this.persistHosts()
+    this.emit()
   }
 
   async saveGroup(input: Partial<HostGroup>): Promise<HostGroup> {

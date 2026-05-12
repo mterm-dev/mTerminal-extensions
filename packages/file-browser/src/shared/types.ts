@@ -80,7 +80,12 @@ export interface FileBrowserState {
   backend: FileBackend | null
   clipboard: FileBrowserClipboard | null
   editorTabs: FileEditorTab[]
-  activeEditorPath: string | null
+  activeEditorKey: string | null
+}
+
+export function fileEditorTabKey(tab: FileEditorTab): string {
+  const hostPart = tab.backend.kind === 'sftp' ? tab.backend.hostId : 'local'
+  return `${tab.backend.kind}:${hostPart}:${tab.path}`
 }
 
 export const DEFAULT_BROWSER_STATE: Omit<FileBrowserState, 'backend'> = {
@@ -94,7 +99,7 @@ export const DEFAULT_BROWSER_STATE: Omit<FileBrowserState, 'backend'> = {
   expandedPaths: [],
   clipboard: null,
   editorTabs: [],
-  activeEditorPath: null,
+  activeEditorKey: null,
 }
 
 export interface FileNode {
