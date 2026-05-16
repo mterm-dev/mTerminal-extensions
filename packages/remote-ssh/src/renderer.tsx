@@ -134,6 +134,7 @@ interface ExtCtx {
         id: string
         label: string
         allowNewTab?: boolean
+        allowNewGroup?: boolean
       }): { dispose(): void }
     }
   }
@@ -149,6 +150,12 @@ const CSS = `
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--border-subtle);
+}
+.rs-panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 4px 16px 6px;
 }
 .term-side-embedded {
   display: contents;
@@ -902,6 +909,7 @@ export function activate(ctx: ExtCtx): void {
     ctx.workspace.sections.register({
       id: 'remote-ssh',
       label: 'remote workspace',
+      allowNewGroup: false,
     }),
   )
 
