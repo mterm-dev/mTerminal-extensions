@@ -8,6 +8,7 @@ import type { HostMeta, HostGroup, HostsSnapshot, SftpAuthBundle } from './share
 
 interface MainCtx {
   id: string
+  dataPath: string
   logger: { info(...a: unknown[]): void; warn(...a: unknown[]): void; error(...a: unknown[]): void }
   ipc: {
     handle(
@@ -19,10 +20,6 @@ interface MainCtx {
   settings: {
     get<T = unknown>(key: string): T | undefined
     onChange(cb: (key: string, value: unknown) => void): { dispose(): void }
-  }
-  globalState: {
-    get<T = unknown>(key: string, def?: T): T | undefined
-    set(key: string, value: unknown): Promise<void>
   }
   providedServices: {
     publish<T>(id: string, impl: T): { dispose(): void }
@@ -43,10 +40,7 @@ export async function activate(ctx: MainCtx): Promise<void> {
 
   const pool = new SshPool()
   const ops = new SftpOps(pool)
-  const store = new HostStore({
-    get: (key, def) => ctx.globalState.get(key, def),
-    set: (key, value) => ctx.globalState.set(key, value),
-  })
+  const store = new HostStore(ctx.dataPath)
   await store.load()
 
   applySettings(ctx, pool, ops)

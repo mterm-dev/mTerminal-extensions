@@ -12,7 +12,7 @@ interface UiHelpers {
   }): void
 }
 
-interface SecretsApi {
+interface VaultApi {
   get(key: string): Promise<string | null>
   set(key: string, value: string): Promise<void>
   delete(key: string): Promise<void>
@@ -23,7 +23,7 @@ interface Props {
   onClose(): void
   onSave(host: HostMeta): Promise<HostMeta>
   listSshKeys(): Promise<SshKey[]>
-  secrets: SecretsApi
+  vault: VaultApi
   ui: UiHelpers
 }
 
@@ -35,7 +35,7 @@ export function HostEditorModal({
   onClose,
   onSave,
   listSshKeys,
-  secrets,
+  vault,
   ui,
 }: Props) {
   const [form, setForm] = useState<HostMeta>(initial ?? emptyHost())
@@ -120,7 +120,7 @@ export function HostEditorModal({
     if (passwordWillBeSaved && !password) {
       const hadSecret =
         isEdit && initial?.id && Boolean(initial?.savePassword)
-          ? Boolean(await secrets.get(`host:${initial.id}`).catch(() => null))
+          ? Boolean(await vault.get(`host:${initial.id}`).catch(() => null))
           : false
       if (!hadSecret) {
         return setError("enter the password to save, or uncheck 'save password'")
@@ -138,11 +138,11 @@ export function HostEditorModal({
       const savedId = saved?.id || meta.id || initial?.id
       if (savedId) {
         if (passwordWillBeSaved && password) {
-          await secrets.set(`host:${savedId}`, password).catch((e) => {
+          await vault.set(`host:${savedId}`, password).catch((e) => {
             ui.toast({ kind: 'warn', message: `could not save password: ${(e as Error).message}` })
           })
         } else if (!passwordWillBeSaved) {
-          await secrets.delete(`host:${savedId}`).catch(() => {})
+          await vault.delete(`host:${savedId}`).catch(() => {})
         }
       }
       onClose()

@@ -27,7 +27,7 @@ interface ExtCtx {
       id: string
       title: string
       icon?: string
-      location: 'sidebar' | 'sidebar.bottom' | 'bottombar'
+      location: 'sidebar' | 'sidebar.bottom' | 'remote-workspace' | 'bottombar'
       render(host: HTMLElement): void | (() => void)
     }): { dispose(): void }
     show(id: string): void
@@ -50,6 +50,7 @@ interface ExtCtx {
       title?: string
       props?: unknown
       groupId?: string | null
+      kind?: 'local' | 'custom' | 'remote'
     }): Promise<number>
   }
   commands: {
@@ -89,6 +90,14 @@ interface ExtCtx {
     set(key: string, value: string): Promise<void>
     delete(key: string): Promise<void>
     has(key: string): Promise<boolean>
+    keys(): Promise<string[]>
+  }
+  vault: {
+    get(key: string): Promise<string | null>
+    set(key: string, value: string): Promise<void>
+    delete(key: string): Promise<void>
+    has(key: string): Promise<boolean>
+    keys(): Promise<string[]>
   }
   settings: {
     get<T = unknown>(key: string): T | undefined
@@ -422,7 +431,7 @@ function PanelHarness({ ctx }: PanelHarnessProps): React.JSX.Element {
           type: 'remote-ssh-terminal',
           title: host.name || `${host.user}@${host.host}`,
           props: { hostId: host.id },
-          groupId: ctx.workspace.activeGroup() ?? undefined,
+          kind: 'remote',
         })
         setActiveHostId(host.id)
         await reg.touchLastUsed(host.id).catch(() => {})
@@ -445,7 +454,7 @@ function PanelHarness({ ctx }: PanelHarnessProps): React.JSX.Element {
           type: 'file-browser',
           title: `files: ${host.name || host.host}`,
           props: { backend: { kind: 'sftp', hostId: host.id } },
-          groupId: ctx.workspace.activeGroup() ?? undefined,
+          kind: 'remote',
         })
       } catch (err) {
         ctx.ui.toast({
@@ -478,7 +487,7 @@ function PanelHarness({ ctx }: PanelHarnessProps): React.JSX.Element {
       })
       if (!ok) return
       await reg.deleteHost(host.id)
-      await ctx.secrets.delete(`host:${host.id}`).catch(() => {})
+      await ctx.vault.delete(`host:${host.id}`).catch(() => {})
     },
     [ctx, reg],
   )
@@ -649,7 +658,7 @@ function PanelHarness({ ctx }: PanelHarnessProps): React.JSX.Element {
         <HostEditorModal
           initial={editor.initial}
           listSshKeys={reg.listSshKeys}
-          secrets={ctx.secrets}
+          vault={ctx.vault}
           ui={ctx.ui}
           onClose={() => setEditor(null)}
           onSave={(host) => reg.saveHost(host)}
@@ -842,7 +851,7 @@ async function buildAuthBundle(
   } else if (host.auth === 'password') {
     let pwd: string | null | undefined
     if (host.savePassword) {
-      pwd = await ctx.secrets.get(`host:${host.id}`)
+      pwd = await ctx.vault.get(`host:${host.id}`)
     }
     if (!pwd) {
       pwd = sessionPasswordCache.get(host.id) ?? null
@@ -867,11 +876,22 @@ export function activate(ctx: ExtCtx): void {
   ctx.logger.info('remote-ssh renderer activating')
   ensureStyles()
 
+  void (async () => {
+    try {
+      const keys = await ctx.secrets.keys()
+      for (const k of keys) {
+        if (k.startsWith('host:')) await ctx.secrets.delete(k).catch(() => {})
+      }
+    } catch {
+      // ignore — legacy cleanup, vault is the source of truth now
+    }
+  })()
+
   ctx.subscribe(
     ctx.panels.register({
       id: 'remote-ssh.hosts',
       title: 'remote',
-      location: 'sidebar',
+      location: 'remote-workspace',
       render: (host: HTMLElement) => {
         const root: Root = createRoot(host)
         root.render(<PanelHarness ctx={ctx} />)

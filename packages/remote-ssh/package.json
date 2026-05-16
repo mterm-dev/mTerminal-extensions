@@ -73,7 +73,7 @@
         {
           "id": "remote-ssh.hosts",
           "title": "remote",
-          "location": "sidebar"
+          "location": "remote-workspace"
         }
       ],
       "commands": [
@@ -90,12 +90,6 @@
         {
           "command": "remoteSsh.openHostsPanel",
           "key": "Ctrl+Shift+G"
-        }
-      ],
-      "secrets": [
-        {
-          "key": "host:*",
-          "title": "saved host passwords"
         }
       ],
       "settings": {

@@ -5,13 +5,10 @@ import { randomUUID } from 'node:crypto'
 import { GROUP_ACCENTS, type GroupAccent } from '../shared/types'
 import type { HostGroup, HostMeta, HostsSnapshot, SshKey, SshAuthMode } from '../shared/types'
 
-export interface KeyValueStore {
-  get<T = unknown>(key: string, def?: T): T | undefined
-  set(key: string, value: unknown): Promise<void>
+interface PersistedFile {
+  hosts?: unknown[]
+  groups?: unknown[]
 }
-
-const HOSTS_KEY = 'hosts'
-const GROUPS_KEY = 'groups'
 
 function newHostId(): string {
   return 'h_' + randomUUID().replace(/-/g, '')
@@ -69,18 +66,33 @@ export class HostStore {
   private groups: HostGroup[] = []
   private listeners = new Set<(snapshot: HostsSnapshot) => void>()
   private loaded = false
+  private readonly filePath: string
 
-  constructor(private store: KeyValueStore) {}
+  constructor(private dataDir: string) {
+    this.filePath = path.join(dataDir, 'hosts.json')
+  }
 
   async load(): Promise<void> {
     if (this.loaded) return
-    const rawHosts = this.store.get<unknown[]>(HOSTS_KEY) ?? []
-    const rawGroups = this.store.get<unknown[]>(GROUPS_KEY) ?? []
-    this.hosts = Array.isArray(rawHosts)
-      ? rawHosts.map((h) => normalizeHost(h as Partial<HostMeta>))
+    let raw: string | null = null
+    try {
+      raw = await fsp.readFile(this.filePath, 'utf-8')
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+    }
+    let parsed: PersistedFile = {}
+    if (raw) {
+      try {
+        parsed = JSON.parse(raw) as PersistedFile
+      } catch {
+        parsed = {}
+      }
+    }
+    this.hosts = Array.isArray(parsed.hosts)
+      ? parsed.hosts.map((h) => normalizeHost(h as Partial<HostMeta>))
       : []
-    this.groups = Array.isArray(rawGroups)
-      ? rawGroups.map((g) => normalizeGroup(g as Partial<HostGroup>))
+    this.groups = Array.isArray(parsed.groups)
+      ? parsed.groups.map((g) => normalizeGroup(g as Partial<HostGroup>))
       : []
     this.loaded = true
   }
@@ -228,12 +240,24 @@ export class HostStore {
     }
   }
 
+  private async persist(): Promise<void> {
+    await fsp.mkdir(this.dataDir, { recursive: true })
+    const payload = JSON.stringify(
+      { hosts: this.hosts, groups: this.groups },
+      null,
+      2,
+    )
+    const tmp = `${this.filePath}.tmp`
+    await fsp.writeFile(tmp, payload, 'utf-8')
+    await fsp.rename(tmp, this.filePath)
+  }
+
   private async persistHosts(): Promise<void> {
-    await this.store.set(HOSTS_KEY, this.hosts)
+    await this.persist()
   }
 
   private async persistGroups(): Promise<void> {
-    await this.store.set(GROUPS_KEY, this.groups)
+    await this.persist()
   }
 }
 

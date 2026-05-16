@@ -1,15 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { HostStore, normalizeHost, normalizeGroup, type KeyValueStore } from '../../src/lib/host-store'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { promises as fsp } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { HostStore, normalizeHost, normalizeGroup } from '../../src/lib/host-store'
 
-function makeStore(): KeyValueStore {
-  const data = new Map<string, unknown>()
-  return {
-    get: <T>(key: string, def?: T) =>
-      (data.has(key) ? (data.get(key) as T) : def) as T | undefined,
-    set: async (key: string, value: unknown) => {
-      data.set(key, value)
-    },
-  }
+async function makeTempDir(): Promise<string> {
+  return fsp.mkdtemp(path.join(os.tmpdir(), 'remote-ssh-host-store-'))
 }
 
 describe('normalizeHost', () => {
@@ -59,16 +55,20 @@ describe('normalizeGroup', () => {
 })
 
 describe('HostStore', () => {
-  let store: KeyValueStore
+  let dir: string
   let hs: HostStore
 
   beforeEach(async () => {
-    store = makeStore()
-    hs = new HostStore(store)
+    dir = await makeTempDir()
+    hs = new HostStore(dir)
     await hs.load()
   })
 
-  it('loads empty when store is empty', () => {
+  afterEach(async () => {
+    await fsp.rm(dir, { recursive: true, force: true })
+  })
+
+  it('loads empty when file is missing', () => {
     expect(hs.listHosts()).toEqual([])
     expect(hs.listGroups()).toEqual([])
   })
@@ -123,11 +123,20 @@ describe('HostStore', () => {
     expect(count).toBe(2)
   })
 
-  it('persists data to store', async () => {
+  it('persists data to disk across instances', async () => {
     await hs.saveHost({ id: 'h_p', host: 'p', user: 'u', auth: 'agent' })
-    const fresh = new HostStore(store)
+    const fresh = new HostStore(dir)
     await fresh.load()
     expect(fresh.getHost('h_p')?.host).toBe('p')
+  })
+
+  it('writes hosts.json with hosts and groups arrays', async () => {
+    await hs.saveHost({ id: 'h_a', host: 'a', user: 'u', auth: 'agent' })
+    await hs.saveGroup({ id: 'g_a', name: 'team', accent: 'blue', collapsed: false })
+    const raw = await fsp.readFile(path.join(dir, 'hosts.json'), 'utf-8')
+    const parsed = JSON.parse(raw) as { hosts: unknown[]; groups: unknown[] }
+    expect(parsed.hosts).toHaveLength(1)
+    expect(parsed.groups).toHaveLength(1)
   })
 
   it('setHostGroup reassigns', async () => {
