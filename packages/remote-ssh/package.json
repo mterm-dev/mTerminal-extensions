@@ -73,7 +73,7 @@
         {
           "id": "remote-ssh.hosts",
           "title": "remote",
-          "location": "remote-workspace"
+          "location": "workspace-section.remote-ssh"
         }
       ],
       "commands": [

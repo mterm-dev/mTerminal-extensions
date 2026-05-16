@@ -27,7 +27,11 @@ interface ExtCtx {
       id: string
       title: string
       icon?: string
-      location: 'sidebar' | 'sidebar.bottom' | 'remote-workspace' | 'bottombar'
+      location:
+        | 'sidebar'
+        | 'sidebar.bottom'
+        | 'bottombar'
+        | `workspace-section.${string}`
       render(host: HTMLElement): void | (() => void)
     }): { dispose(): void }
     show(id: string): void
@@ -50,7 +54,7 @@ interface ExtCtx {
       title?: string
       props?: unknown
       groupId?: string | null
-      kind?: 'local' | 'custom' | 'remote'
+      kind?: string
     }): Promise<number>
   }
   commands: {
@@ -125,6 +129,13 @@ interface ExtCtx {
   }
   workspace: {
     activeGroup(): string | null
+    sections: {
+      register(section: {
+        id: string
+        label: string
+        allowNewTab?: boolean
+      }): { dispose(): void }
+    }
   }
   subscribe(d: { dispose(): void } | (() => void)): void
 }
@@ -431,7 +442,7 @@ function PanelHarness({ ctx }: PanelHarnessProps): React.JSX.Element {
           type: 'remote-ssh-terminal',
           title: host.name || `${host.user}@${host.host}`,
           props: { hostId: host.id },
-          kind: 'remote',
+          kind: 'remote-ssh',
         })
         setActiveHostId(host.id)
         await reg.touchLastUsed(host.id).catch(() => {})
@@ -454,7 +465,7 @@ function PanelHarness({ ctx }: PanelHarnessProps): React.JSX.Element {
           type: 'file-browser',
           title: `files: ${host.name || host.host}`,
           props: { backend: { kind: 'sftp', hostId: host.id } },
-          kind: 'remote',
+          kind: 'remote-ssh',
         })
       } catch (err) {
         ctx.ui.toast({
@@ -888,10 +899,17 @@ export function activate(ctx: ExtCtx): void {
   })()
 
   ctx.subscribe(
+    ctx.workspace.sections.register({
+      id: 'remote-ssh',
+      label: 'remote workspace',
+    }),
+  )
+
+  ctx.subscribe(
     ctx.panels.register({
       id: 'remote-ssh.hosts',
       title: 'remote',
-      location: 'remote-workspace',
+      location: 'workspace-section.remote-ssh',
       render: (host: HTMLElement) => {
         const root: Root = createRoot(host)
         root.render(<PanelHarness ctx={ctx} />)
