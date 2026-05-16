@@ -322,17 +322,20 @@ export function RemoteSshPanel(props: Props): React.JSX.Element {
 
   return (
     <div className="term-side-embedded" aria-label="Remote workspace">
-      <div className="term-side-section-row rs-panel-actions">
-        <button
-          className="ghost-btn"
-          title="new host"
-          onClick={() => onAddHost(null)}
-        >
-          + host
-        </button>
-        <button className="ghost-btn" title="new host group" onClick={onAddGroup}>
-          + group
-        </button>
+      <div className="term-side-section term-side-section-row">
+        <span>remote workspace</span>
+        <div className="term-side-actions">
+          <button
+            className="ghost-btn"
+            title="new host"
+            onClick={() => onAddHost(null)}
+          >
+            + host
+          </button>
+          <button className="ghost-btn" title="new group" onClick={onAddGroup}>
+            + group
+          </button>
+        </div>
       </div>
 
       <div
