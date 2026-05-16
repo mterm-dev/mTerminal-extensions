@@ -75,7 +75,7 @@ export interface PanelContribution {
   id: string
   title: string
   icon?: string
-  location: 'sidebar' | 'sidebar.bottom' | 'bottombar'
+  location: 'sidebar' | 'sidebar.bottom' | 'remote-workspace' | 'bottombar'
   initialCollapsed?: boolean
 }
 
@@ -397,7 +397,7 @@ export interface PanelsApi {
     id: string
     title: string
     icon?: string
-    location: 'sidebar' | 'sidebar.bottom' | 'bottombar'
+    location: 'sidebar' | 'sidebar.bottom' | 'remote-workspace' | 'bottombar'
     initialCollapsed?: boolean
     /**
      * Render the panel. Return a disposer to clean up DOM listeners; React
@@ -475,6 +475,14 @@ export interface TabsApi {
     title?: string
     props?: unknown
     groupId?: string | null
+    /**
+     * Which workspace section the tab belongs to. Defaults to `'local'` (or
+     * `'custom'` when the host distinguishes them). Use `'remote'` for tabs
+     * that should live under the Remote Workspace section in the sidebar
+     * (e.g. SSH terminals, SFTP file browsers).
+     * @since mterminal-api 1.6.0
+     */
+    kind?: 'local' | 'custom' | 'remote'
   }): Promise<number>
   close(tabId: number): void
   active(): { id: number; type: string } | null

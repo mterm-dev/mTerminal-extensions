@@ -3,7 +3,7 @@ import { useGitStatus, type GitFile } from "../hooks/useGitStatus";
 import { GitDiffModal } from "../components/GitDiffModal";
 import type { GitPanelSettings as Settings } from "../types";
 import type { AiBindingConfig } from "../renderer";
-import type { AiApi, SecretsApi } from "@mterminal/extension-api";
+import type { AiApi, SecretsApi, VaultApi } from "@mterminal/extension-api";
 import {
   buildTree,
   collectDirPaths,
@@ -60,6 +60,11 @@ const FEW_SHOT_DIFF = `Generate a commit message for the following staged change
 
 const FEW_SHOT_COMMIT = `refactor: rename port to PORT and read from env`;
 
+const isVaultLockedError = (e: unknown): boolean => {
+  const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "";
+  return msg.toLowerCase().includes("vault locked");
+};
+
 interface UiBridge {
   confirm(opts: {
     title: string;
@@ -88,6 +93,7 @@ interface Props {
   binding: AiBindingConfig;
   ai: AiApi;
   secrets: SecretsApi;
+  vault: VaultApi;
   ui: UiBridge;
   height: number;
   onResizeHeight: (h: number) => void;
@@ -113,6 +119,7 @@ export function GitPanel({
   binding,
   ai,
   secrets,
+  vault,
   ui,
   height,
   onResizeHeight,
@@ -148,6 +155,13 @@ export function GitPanel({
   const [aiError, setAiError] = useState<string | null>(null);
 
   const reportAiError = (msg: string, e?: unknown): void => {
+    if (e !== undefined && isVaultLockedError(e)) {
+      const friendly =
+        "Vault is locked — unlock it from the master-password prompt to generate commit messages.";
+      setAiError(friendly);
+      ui.toast({ kind: "warn", title: "Vault locked", message: friendly });
+      return;
+    }
     setAiError(msg);
     const err = e instanceof Error ? e : undefined;
     ui.toast({
@@ -466,10 +480,21 @@ export function GitPanel({
       return;
     }
 
+    try {
+      await vault.has("__ai_warmup__");
+    } catch (e) {
+      reportAiError(e instanceof Error ? e.message : String(e), e);
+      return;
+    }
+
     let customKey: string | null = null;
     if (source === "custom") {
+      const keyName = `ai.commit.${provider}.apiKey`;
       try {
-        customKey = await secrets.get(`ai.commit.${provider}.apiKey`);
+        customKey = await vault.get(keyName);
+        if (!customKey) {
+          customKey = await secrets.get(keyName);
+        }
       } catch (e) {
         reportAiError((e as Error).message, e);
         return;

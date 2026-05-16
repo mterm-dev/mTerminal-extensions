@@ -22,10 +22,11 @@ import { setGitClient } from "./lib/git-api";
  *
  * Two source modes:
  *   • "core"   — use the global vault key from Settings → AI.
- *   • "custom" — read a per-binding key from `ctx.secrets` and pass it as
+ *   • "custom" — read a per-binding key from `ctx.vault` (with fallback to
+ *     `ctx.secrets` for keys saved by older host versions) and pass it as
  *     `apiKey` to `ctx.ai.stream()`; the host instantiates an ad-hoc SDK
- *     client for that call only and falls back to the global key when no
- *     override is supplied.
+ *     client for that call only and falls back to the global vault key when
+ *     no override is supplied.
  */
 
 export interface AiBindingConfig {
@@ -123,6 +124,7 @@ function GitPanelMount({ ctx }: { ctx: ExtensionContext }) {
       binding={binding}
       ai={ctx.ai}
       secrets={ctx.secrets}
+      vault={ctx.vault}
       ui={ctx.ui}
       height={height}
       onResizeHeight={(h) => {
